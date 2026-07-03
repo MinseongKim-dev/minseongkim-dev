@@ -94,9 +94,9 @@ export function SignupForm({ onSwitchToLogin }: SignupFormProps) {
   return (
     <div className={styles.authPage}>
       <div className={styles.authCard}>
-        <div className={styles.authLogo}>✨</div>
-        <h1 className={styles.authTitle}>회원가입</h1>
-        <p className={styles.authSubtitle}>AI 포트폴리오 빌더를 시작하세요</p>
+        <div className={styles.authLogo}>N</div>
+        <h1 className={styles.authTitle}>Node 회원가입</h1>
+        <p className={styles.authSubtitle}>AI 라이프 매니저를 시작하세요</p>
 
         <form className={styles.form} onSubmit={handleSignup}>
           <div className={styles.field}>
