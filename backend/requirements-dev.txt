@@ -1,4 +1,4 @@
-# Development dependencies for the eval baseline
-# Install with: pip install -r requirements-dev.txt
-pytest>=7.4
-pyyaml>=6.0
+pytest>=8.0
+pytest-mock>=3.12
+moto[dynamodb]>=5.0
+ruff>=0.4

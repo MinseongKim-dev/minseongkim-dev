@@ -1,45 +1,22 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >
-  AI Portfolio Builder - AWS Serverless stack
-  (API Gateway + Lambda + Bedrock + DynamoDB + S3 + CloudFront + Cognito)
+Description: Node - AI Life Manager Backend
 
 # ---------------------------------------------------------------------------
 # Globals
 # ---------------------------------------------------------------------------
 Globals:
   Function:
-    Runtime: python3.13
-    Handler: handler.handler
-    Timeout: 60
+    Runtime: python3.12
     MemorySize: 256
-    Layers:
-      - !Ref DependenciesLayer
+    Timeout: 30
+    CodeUri: ../backend/
     Environment:
       Variables:
-        AWS_ACCOUNT_ID: !Ref AWS::AccountId
-        SESSIONS_TABLE: !Ref SessionsTable
-        PORTFOLIOS_TABLE: !Ref PortfoliosTable
-        DIARY_TABLE: !Ref DiaryTable
-        BLOG_TABLE: !Ref BlogTable
-        WORKOUT_TABLE: !Ref WorkoutTable
-        KNOWLEDGE_TABLE: !Ref KnowledgeTable
-        GOALS_TABLE: !Ref GoalsTable
-        LIFEWHEEL_TABLE: !Ref LifeWheelTable
-        MANDALART_TABLE: !Ref MandalartTable
-        HABITS_TABLE: !Ref HabitsTable
-        TASKS_TABLE: !Ref TasksTable
-        JOURNAL_TABLE: !Ref JournalTable
-        PROJECTS_TABLE: !Ref ProjectsTable
-        CORS_ORIGIN: !Ref AllowedOrigin
-        BEDROCK_REGION: !Ref AWS::Region
-        BEDROCK_MODEL_ID: "anthropic.claude-3-5-sonnet-20240620-v1:0"
-        MAX_TOKENS: "4096"
-  Api:
-    Cors:
-      AllowMethods: "'GET,POST,PUT,OPTIONS'"
-      AllowHeaders: "'Content-Type,Authorization'"
-      AllowOrigin: !Sub "'${AllowedOrigin}'"
+        TABLE_NAME: !Ref NodeTable
+        BEDROCK_MODEL_ID: anthropic.claude-sonnet-4-20250514
+        BEDROCK_REGION: us-east-1
+        MONTHLY_AI_BUDGET: "10.0"
 
 # ---------------------------------------------------------------------------
 # Parameters
@@ -49,26 +26,21 @@ Parameters:
     Type: String
     Default: dev
     AllowedValues: [dev, staging, prod]
-    Description: Deployment environment
 
   AllowedOrigin:
     Type: String
     Default: "*"
     Description: >
-      Allowed CORS origin for API Gateway and Lambda.
-      On initial deploy, keep the default '*'.
-      After the CloudFront distribution is created, update this parameter
-      to 'https://<distribution-domain>.cloudfront.net' to restrict CORS.
+      Allowed CORS origin. Keep '*' on initial deploy.
+      After CloudFront is up, set to 'https://<cf-domain>.cloudfront.net'.
 
   ApiDomainName:
     Type: String
     Default: ""
     Description: >
-      API Gateway domain name for the CloudFront API origin.
-      Leave empty on the FIRST deployment (CloudFront will serve S3 only).
-      After the first deployment, copy the value from the ApiUrl output
-      (e.g. abc123.execute-api.ap-northeast-2.amazonaws.com) and redeploy
-      to enable CloudFront → API Gateway proxying.
+      API Gateway domain for CloudFront API origin.
+      Leave empty on first deployment. After deploy, copy ApiUrl output value
+      (e.g. abc123.execute-api.ap-northeast-2.amazonaws.com) and redeploy.
 
 # ---------------------------------------------------------------------------
 # Conditions
@@ -81,11 +53,11 @@ Conditions:
 # ---------------------------------------------------------------------------
 Resources:
 
-  # ── Cognito User Pool ────────────────────────────────────────────────────
-  CognitoUserPool:
+  # ── Cognito ────────────────────────────────────────────────────────────────
+  UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: !Sub "portfolio-user-pool-${Environment}"
+      UserPoolName: !Sub "node-users-${Environment}"
       UsernameAttributes:
         - email
       AutoVerifiedAttributes:
@@ -102,14 +74,17 @@ Resources:
           AttributeDataType: String
           Required: true
           Mutable: true
+        - Name: display_name
+          AttributeDataType: String
+          Mutable: true
       UserPoolTags:
         Environment: !Ref Environment
 
-  CognitoUserPoolClient:
+  UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
-      ClientName: !Sub "portfolio-app-client-${Environment}"
-      UserPoolId: !Ref CognitoUserPool
+      ClientName: !Sub "node-web-${Environment}"
+      UserPoolId: !Ref UserPool
       GenerateSecret: false
       ExplicitAuthFlows:
         - ALLOW_USER_SRP_AUTH
@@ -123,1191 +98,252 @@ Resources:
       IdTokenValidity: 1
       RefreshTokenValidity: 30
 
-  # ── Shared Lambda Layer (Python dependencies) ───────────────────────────
+  # ── DynamoDB — Single Table Design ─────────────────────────────────────────
+  NodeTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      TableName: !Sub "node-main-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-TypeDate
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-Custom
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ── Lambda Layer (shared Python dependencies) ───────────────────────────────
   DependenciesLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      LayerName: !Sub "portfolio-deps-${Environment}"
+      LayerName: !Sub "node-deps-${Environment}"
       Description: Shared Python dependencies (boto3)
       ContentUri: ../backend/
       CompatibleRuntimes:
-        - python3.13
+        - python3.12
       RetentionPolicy: Delete
     Metadata:
-      BuildMethod: python3.13
+      BuildMethod: python3.12
 
-  # ── DynamoDB Tables ──────────────────────────────────────────────────────
-  SessionsTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
+  # ── API Gateway — HTTP API ──────────────────────────────────────────────────
+  NodeApi:
+    Type: AWS::Serverless::HttpApi
     Properties:
-      TableName: !Sub "portfolio-sessions-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: sessionId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: sessionId
-          KeyType: HASH
-      TimeToLiveSpecification:
-        AttributeName: ttl
-        Enabled: true
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  PortfoliosTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "portfolio-data-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: id
-          AttributeType: S
-        - AttributeName: sessionId
-          AttributeType: S
-        - AttributeName: updatedAt
-          AttributeType: S
-      KeySchema:
-        - AttributeName: id
-          KeyType: HASH
-      GlobalSecondaryIndexes:
-        - IndexName: sessionId-index
-          KeySchema:
-            - AttributeName: sessionId
-              KeyType: HASH
-            - AttributeName: updatedAt
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  BlogTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "portfolio-blog-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: postId
-          AttributeType: S
-        - AttributeName: status
-          AttributeType: S
-        - AttributeName: publishedAt
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-        - AttributeName: postId
-          KeyType: RANGE
-      GlobalSecondaryIndexes:
-        - IndexName: status-publishedAt-index
-          KeySchema:
-            - AttributeName: status
-              KeyType: HASH
-            - AttributeName: publishedAt
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  DiaryTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "portfolio-diary-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: entryId
-          AttributeType: S
-        - AttributeName: category
-          AttributeType: S
-        - AttributeName: createdAt
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-        - AttributeName: entryId
-          KeyType: RANGE
-      GlobalSecondaryIndexes:
-        - IndexName: category-createdAt-index
-          KeySchema:
-            - AttributeName: category
-              KeyType: HASH
-            - AttributeName: createdAt
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  WorkoutTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "lifemanager-workout-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: workoutId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-        - AttributeName: workoutId
-          KeyType: RANGE
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  KnowledgeTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "lifemanager-knowledge-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: knowledgeId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-        - AttributeName: knowledgeId
-          KeyType: RANGE
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  GoalsTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "lifemanager-goals-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: goalId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-        - AttributeName: goalId
-          KeyType: RANGE
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  LifeWheelTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "lifemanager-lifewheel-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: wheelId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-        - AttributeName: wheelId
-          KeyType: RANGE
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  MandalartTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "lifemanager-mandalart-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: mandalartId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-        - AttributeName: mandalartId
-          KeyType: RANGE
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  HabitsTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "lifemanager-habits-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: habitId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-        - AttributeName: habitId
-          KeyType: RANGE
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  TasksTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "lifemanager-tasks-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: taskId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-        - AttributeName: taskId
-          KeyType: RANGE
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  JournalTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "lifemanager-journal-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: journalId
-          AttributeType: S
-        - AttributeName: journalType
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-        - AttributeName: journalId
-          KeyType: RANGE
-      GlobalSecondaryIndexes:
-        - IndexName: userId-journalType-index
-          KeySchema:
-            - AttributeName: userId
-              KeyType: HASH
-            - AttributeName: journalType
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  ProjectsTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    Properties:
-      TableName: !Sub "lifemanager-projects-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-        - AttributeName: projectId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-        - AttributeName: projectId
-          KeyType: RANGE
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  # ── IAM Role (shared by Lambda functions) ───────────────────────────────
-  LambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "portfolio-lambda-role-${Environment}"
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: DynamoDBAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - dynamodb:GetItem
-                  - dynamodb:PutItem
-                  - dynamodb:UpdateItem
-                  - dynamodb:DeleteItem
-                  - dynamodb:Query
-                  - dynamodb:Scan
-                Resource:
-                  - !GetAtt SessionsTable.Arn
-                  - !GetAtt PortfoliosTable.Arn
-                  - !Sub "${PortfoliosTable.Arn}/index/*"
-                  - !GetAtt DiaryTable.Arn
-                  - !Sub "${DiaryTable.Arn}/index/*"
-                  - !GetAtt BlogTable.Arn
-                  - !Sub "${BlogTable.Arn}/index/*"
-                  - !GetAtt WorkoutTable.Arn
-                  - !GetAtt KnowledgeTable.Arn
-                  - !GetAtt GoalsTable.Arn
-                  - !GetAtt LifeWheelTable.Arn
-                  - !GetAtt MandalartTable.Arn
-                  - !GetAtt HabitsTable.Arn
-                  - !GetAtt TasksTable.Arn
-                  - !GetAtt JournalTable.Arn
-                  - !Sub "${JournalTable.Arn}/index/*"
-                  - !GetAtt ProjectsTable.Arn
-        - PolicyName: BedrockAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - bedrock:InvokeModel
-                Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0"
-
-  # ── Lambda Functions ─────────────────────────────────────────────────────
-  ChatFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "portfolio-chat-${Environment}"
-      CodeUri: ../backend/functions/chat/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Handle chat messages via Bedrock and update portfolio"
-      Events:
-        ChatPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /chat
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        ChatOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /chat
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  AssistantFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "lifemanager-assistant-${Environment}"
-      CodeUri: ../backend/functions/assistant/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "General-purpose AI life manager assistant via Bedrock"
-      Events:
-        AssistantPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /assistant
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        AssistantOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /assistant
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  PortfolioFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "portfolio-crud-${Environment}"
-      CodeUri: ../backend/functions/portfolio/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "CRUD operations for portfolio data"
-      Events:
-        PortfolioGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /portfolio/{sessionId}
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        PortfolioPut:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /portfolio/{sessionId}
-            Method: PUT
-            Auth:
-              Authorizer: CognitoAuthorizer
-        PortfolioOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /portfolio/{sessionId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  DiaryFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "portfolio-diary-${Environment}"
-      CodeUri: ../backend/functions/diary/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Diary CRUD with Bedrock category classification"
-      Events:
-        DiaryPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /diary
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        DiaryGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /diary
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        DiaryOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /diary
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  StatsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "portfolio-stats-${Environment}"
-      CodeUri: ../backend/functions/stats/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Diary statistics aggregation"
-      Events:
-        StatsGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /stats
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        StatsOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /stats
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  PublicPortfolioFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "portfolio-public-${Environment}"
-      CodeUri: ../backend/functions/public/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Public portfolio access (no auth required)"
-      Events:
-        PublicGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /public/{portfolioId}
-            Method: GET
-            Auth:
-              Authorizer: NONE
-        PublicOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /public/{portfolioId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  BlogFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "portfolio-blog-${Environment}"
-      CodeUri: ../backend/functions/blog/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Blog post CRUD with AI generation from diary entries"
-      Events:
-        BlogPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /blog
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        BlogGetList:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /blog
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        BlogGetItem:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /blog/{postId}
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        BlogPut:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /blog/{postId}
-            Method: PUT
-            Auth:
-              Authorizer: CognitoAuthorizer
-        BlogDelete:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /blog/{postId}
-            Method: DELETE
-            Auth:
-              Authorizer: CognitoAuthorizer
-        BlogOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /blog
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        BlogItemOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /blog/{postId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  PublicBlogFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "portfolio-public-blog-${Environment}"
-      CodeUri: ../backend/functions/public_blog/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Public blog access (no auth required)"
-      Events:
-        PublicBlogGetList:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /public/blog/{userId}
-            Method: GET
-            Auth:
-              Authorizer: NONE
-        PublicBlogGetItem:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /public/blog/{userId}/{postId}
-            Method: GET
-            Auth:
-              Authorizer: NONE
-        PublicBlogListOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /public/blog/{userId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        PublicBlogItemOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /public/blog/{userId}/{postId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  BlogPublishFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "portfolio-blog-publish-${Environment}"
-      CodeUri: ../backend/functions/blog_publish/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Blog post publishing to external platforms (Medium, Tistory)"
-      Events:
-        BlogPublishPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /blog/{postId}/publish/{platform}
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        BlogPublishOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /blog/{postId}/publish/{platform}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  WorkoutFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "lifemanager-workout-${Environment}"
-      CodeUri: ../backend/functions/workout/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Workout tracking CRUD"
-      Events:
-        WorkoutPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /workout
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        WorkoutGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /workout
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        WorkoutDelete:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /workout/{workoutId}
-            Method: DELETE
-            Auth:
-              Authorizer: CognitoAuthorizer
-        WorkoutOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /workout
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        WorkoutItemOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /workout/{workoutId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  KnowledgeFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "lifemanager-knowledge-${Environment}"
-      CodeUri: ../backend/functions/knowledge/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Knowledge management CRUD with AI summarisation"
-      Events:
-        KnowledgePost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /knowledge
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        KnowledgeGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /knowledge
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        KnowledgeDelete:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /knowledge/{knowledgeId}
-            Method: DELETE
-            Auth:
-              Authorizer: CognitoAuthorizer
-        KnowledgeOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /knowledge
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        KnowledgeItemOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /knowledge/{knowledgeId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  GoalsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "lifemanager-goals-${Environment}"
-      CodeUri: ../backend/functions/goals/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Goal tracking CRUD"
-      Events:
-        GoalsPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /goals
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        GoalsGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /goals
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        GoalsPut:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /goals/{goalId}
-            Method: PUT
-            Auth:
-              Authorizer: CognitoAuthorizer
-        GoalsDelete:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /goals/{goalId}
-            Method: DELETE
-            Auth:
-              Authorizer: CognitoAuthorizer
-        GoalsOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /goals
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        GoalsItemOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /goals/{goalId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  LifeWheelFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "lifemanager-lifewheel-${Environment}"
-      CodeUri: ../backend/functions/lifewheel/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Life Wheel CRUD"
-      Events:
-        LifeWheelPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /lifewheel
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        LifeWheelGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /lifewheel
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        LifeWheelDelete:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /lifewheel/{wheelId}
-            Method: DELETE
-            Auth:
-              Authorizer: CognitoAuthorizer
-        LifeWheelOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /lifewheel
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        LifeWheelItemOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /lifewheel/{wheelId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  MandalartFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "lifemanager-mandalart-${Environment}"
-      CodeUri: ../backend/functions/mandalart/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Mandalart CRUD"
-      Events:
-        MandalartPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /mandalart
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        MandalartGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /mandalart
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        MandalartPut:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /mandalart/{mandalartId}
-            Method: PUT
-            Auth:
-              Authorizer: CognitoAuthorizer
-        MandalartDelete:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /mandalart/{mandalartId}
-            Method: DELETE
-            Auth:
-              Authorizer: CognitoAuthorizer
-        MandalartOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /mandalart
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        MandalartItemOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /mandalart/{mandalartId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  HabitsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "lifemanager-habits-${Environment}"
-      CodeUri: ../backend/functions/habits/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Habits tracker CRUD"
-      Events:
-        HabitsPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /habits
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        HabitsGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /habits
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        HabitsPut:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /habits/{habitId}
-            Method: PUT
-            Auth:
-              Authorizer: CognitoAuthorizer
-        HabitsDelete:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /habits/{habitId}
-            Method: DELETE
-            Auth:
-              Authorizer: CognitoAuthorizer
-        HabitsOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /habits
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        HabitsItemOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /habits/{habitId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  TasksFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "lifemanager-tasks-${Environment}"
-      CodeUri: ../backend/functions/tasks/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Eisenhower matrix tasks CRUD"
-      Events:
-        TasksPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /tasks
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        TasksGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /tasks
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        TasksPut:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /tasks/{taskId}
-            Method: PUT
-            Auth:
-              Authorizer: CognitoAuthorizer
-        TasksDelete:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /tasks/{taskId}
-            Method: DELETE
-            Auth:
-              Authorizer: CognitoAuthorizer
-        TasksOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /tasks
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        TasksItemOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /tasks/{taskId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  JournalFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "lifemanager-journal-${Environment}"
-      CodeUri: ../backend/functions/journal/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Journal entries CRUD"
-      Events:
-        JournalPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /journal
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        JournalGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /journal
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        JournalPut:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /journal/{journalId}
-            Method: PUT
-            Auth:
-              Authorizer: CognitoAuthorizer
-        JournalDelete:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /journal/{journalId}
-            Method: DELETE
-            Auth:
-              Authorizer: CognitoAuthorizer
-        JournalOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /journal
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        JournalItemOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /journal/{journalId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-
-  ProjectsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "lifemanager-projects-${Environment}"
-      CodeUri: ../backend/functions/projects/
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Description: "Projects CRUD"
-      Events:
-        ProjectsPost:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /projects
-            Method: POST
-            Auth:
-              Authorizer: CognitoAuthorizer
-        ProjectsGet:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /projects
-            Method: GET
-            Auth:
-              Authorizer: CognitoAuthorizer
-        ProjectsPut:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /projects/{projectId}
-            Method: PUT
-            Auth:
-              Authorizer: CognitoAuthorizer
-        ProjectsDelete:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /projects/{projectId}
-            Method: DELETE
-            Auth:
-              Authorizer: CognitoAuthorizer
-        ProjectsOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /projects
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        ProjectsItemOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref PortfolioApi
-            Path: /projects/{projectId}
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-  PortfolioApi:
-    Type: AWS::Serverless::Api
-    Properties:
-      Name: !Sub "portfolio-api-${Environment}"
       StageName: !Ref Environment
-      TracingEnabled: true
-      MethodSettings:
-        - ResourcePath: "/*"
-          HttpMethod: "*"
-          ThrottlingBurstLimit: 100
-          ThrottlingRateLimit: 50
       Auth:
         DefaultAuthorizer: CognitoAuthorizer
-        AddDefaultAuthorizerToCorsPreflight: false
         Authorizers:
           CognitoAuthorizer:
-            UserPoolArn: !GetAtt CognitoUserPool.Arn
-            Identity:
-              Header: Authorization
+            AuthorizationScopes:
+              - openid
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}"
+              audience:
+                - !Ref UserPoolClient
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        MaxAge: 600
 
-  # ── S3 Bucket (frontend static assets) ──────────────────────────────────
+  # ── Lambda Functions ────────────────────────────────────────────────────────
+  AiChatFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "node-ai-chat-${Environment}"
+      Handler: handlers/ai_handler.handler
+      Timeout: 60
+      Layers:
+        - !Ref DependenciesLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NodeTable
+        - Statement:
+            Effect: Allow
+            Action: bedrock:InvokeModel
+            Resource: "*"
+      Events:
+        Chat:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NodeApi
+            Path: /ai/chat
+            Method: POST
+
+  CrudFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "node-crud-${Environment}"
+      Handler: handlers/crud_handler.handler
+      Layers:
+        - !Ref DependenciesLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NodeTable
+      Events:
+        GetItems:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NodeApi
+            Path: /{domain}
+            Method: GET
+        CreateItem:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NodeApi
+            Path: /{domain}
+            Method: POST
+        UpdateItem:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NodeApi
+            Path: /{domain}/{id}
+            Method: PUT
+        DeleteItem:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NodeApi
+            Path: /{domain}/{id}
+            Method: DELETE
+        GetItem:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NodeApi
+            Path: /{domain}/{id}
+            Method: GET
+
+  ProactiveFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "node-proactive-${Environment}"
+      Handler: handlers/proactive_handler.handler
+      Layers:
+        - !Ref DependenciesLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NodeTable
+        - Statement:
+            Effect: Allow
+            Action: bedrock:InvokeModel
+            Resource: "*"
+      Events:
+        DailyBriefing:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 22 * * ? *)
+            Description: "Daily briefing at 07:00 KST"
+            Enabled: true
+
+  CareerCoachFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "node-career-coach-${Environment}"
+      Handler: handlers/career_coach_handler.handler
+      Timeout: 60
+      Layers:
+        - !Ref DependenciesLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NodeTable
+        - Statement:
+            Effect: Allow
+            Action: bedrock:InvokeModel
+            Resource: "*"
+      Events:
+        ProfileTarget:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NodeApi
+            Path: /career/coach/profile
+            Method: POST
+        AssessState:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NodeApi
+            Path: /career/coach/assess
+            Method: POST
+        GeneratePaths:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NodeApi
+            Path: /career/coach/paths
+            Method: POST
+        SelectPath:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NodeApi
+            Path: /career/coach/paths/{pathId}/select
+            Method: POST
+        RunCoaching:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref NodeApi
+            Path: /career/coach/coaching/{targetId}
+            Method: POST
+
+  # ── CloudWatch Alarm — Bedrock cost guard ──────────────────────────────────
+  BedrockCostAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "node-bedrock-cost-warning-${Environment}"
+      AlarmDescription: "Bedrock estimated cost >= $8 (80% of $10 monthly budget)"
+      MetricName: BedrockEstimatedCost
+      Namespace: Node/AI
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 8.0
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  # ── S3 Bucket (frontend static assets) ─────────────────────────────────────
   FrontendBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub "portfolio-frontend-${Environment}-${AWS::AccountId}"
+      BucketName: !Sub "node-frontend-${Environment}-${AWS::AccountId}"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -1332,12 +368,12 @@ Resources:
               StringEquals:
                 AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
 
-  # ── CloudFront Distribution ──────────────────────────────────────────────
+  # ── CloudFront Distribution ─────────────────────────────────────────────────
   CloudFrontOAC:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: !Sub "portfolio-oac-${Environment}"
+        Name: !Sub "node-oac-${Environment}"
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
@@ -1346,7 +382,7 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
-        Comment: !Sub "AI Portfolio Builder - ${Environment}"
+        Comment: !Sub "Node AI Life Manager - ${Environment}"
         Enabled: true
         DefaultRootObject: index.html
         HttpVersion: http2
@@ -1368,7 +404,7 @@ Resources:
         DefaultCacheBehavior:
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
-          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
           Compress: true
         CacheBehaviors:
           - !If
@@ -1376,9 +412,9 @@ Resources:
             - PathPattern: !Sub "/${Environment}/*"
               TargetOriginId: ApiOrigin
               ViewerProtocolPolicy: https-only
-              CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
+              CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
               AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
-              OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac  # AllViewerExceptHostHeader
+              OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
             - !Ref AWS::NoValue
         CustomErrorResponses:
           - ErrorCode: 403
@@ -1396,16 +432,14 @@ Resources:
 # ---------------------------------------------------------------------------
 Outputs:
   ApiUrl:
-    Description: "API Gateway endpoint URL"
-    Value: !Sub "https://${PortfolioApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+    Description: "API Gateway (HTTP API) endpoint URL"
+    Value: !Sub "https://${NodeApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
     Export:
       Name: !Sub "${AWS::StackName}-ApiUrl"
 
   ApiDomainName:
-    Description: >
-      API Gateway domain name - use this value for the ApiDomainName parameter
-      on the second deployment to enable CloudFront → API proxying.
-    Value: !Sub "${PortfolioApi}.execute-api.${AWS::Region}.amazonaws.com"
+    Description: "Use this for ApiDomainName parameter on second deployment"
+    Value: !Sub "${NodeApi}.execute-api.${AWS::Region}.amazonaws.com"
     Export:
       Name: !Sub "${AWS::StackName}-ApiDomainName"
 
@@ -1416,91 +450,25 @@ Outputs:
       Name: !Sub "${AWS::StackName}-CloudFrontUrl"
 
   FrontendBucketName:
-    Description: "S3 bucket name for frontend assets"
+    Description: "S3 bucket for frontend assets"
     Value: !Ref FrontendBucket
     Export:
       Name: !Sub "${AWS::StackName}-FrontendBucket"
 
-  SessionsTableName:
-    Description: "DynamoDB sessions table name"
-    Value: !Ref SessionsTable
-    Export:
-      Name: !Sub "${AWS::StackName}-SessionsTable"
-
-  PortfoliosTableName:
-    Description: "DynamoDB portfolios table name"
-    Value: !Ref PortfoliosTable
-    Export:
-      Name: !Sub "${AWS::StackName}-PortfoliosTable"
-
-  DiaryTableName:
-    Description: "DynamoDB diary table name"
-    Value: !Ref DiaryTable
-    Export:
-      Name: !Sub "${AWS::StackName}-DiaryTable"
-
-  BlogTableName:
-    Description: "DynamoDB blog table name"
-    Value: !Ref BlogTable
-    Export:
-      Name: !Sub "${AWS::StackName}-BlogTable"
-
-  WorkoutTableName:
-    Description: "DynamoDB workout table name"
-    Value: !Ref WorkoutTable
-    Export:
-      Name: !Sub "${AWS::StackName}-WorkoutTable"
-
-  KnowledgeTableName:
-    Description: "DynamoDB knowledge table name"
-    Value: !Ref KnowledgeTable
-    Export:
-      Name: !Sub "${AWS::StackName}-KnowledgeTable"
-
-  GoalsTableName:
-    Description: "DynamoDB goals table name"
-    Value: !Ref GoalsTable
-    Export:
-      Name: !Sub "${AWS::StackName}-GoalsTable"
-
-  LifeWheelTableName:
-    Description: "DynamoDB life wheel table name"
-    Value: !Ref LifeWheelTable
-    Export:
-      Name: !Sub "${AWS::StackName}-LifeWheelTable"
-
-  MandalartTableName:
-    Description: "DynamoDB mandalart table name"
-    Value: !Ref MandalartTable
-    Export:
-      Name: !Sub "${AWS::StackName}-MandalartTable"
-
-  HabitsTableName:
-    Description: "DynamoDB habits table name"
-    Value: !Ref HabitsTable
-    Export:
-      Name: !Sub "${AWS::StackName}-HabitsTable"
-
-  TasksTableName:
-    Description: "DynamoDB tasks table name"
-    Value: !Ref TasksTable
-    Export:
-      Name: !Sub "${AWS::StackName}-TasksTable"
-
-  JournalTableName:
-    Description: "DynamoDB journal table name"
-    Value: !Ref JournalTable
-    Export:
-      Name: !Sub "${AWS::StackName}-JournalTable"
-
   UserPoolId:
     Description: "Cognito User Pool ID"
-    Value: !Ref CognitoUserPool
+    Value: !Ref UserPool
     Export:
       Name: !Sub "${AWS::StackName}-UserPoolId"
 
   UserPoolClientId:
     Description: "Cognito User Pool Client ID"
-    Value: !Ref CognitoUserPoolClient
+    Value: !Ref UserPoolClient
     Export:
       Name: !Sub "${AWS::StackName}-UserPoolClientId"
+
+  NodeTableName:
+    Description: "DynamoDB single table name"
+    Value: !Ref NodeTable
+    Export:
+      Name: !Sub "${AWS::StackName}-NodeTable"
