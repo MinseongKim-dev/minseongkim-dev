@@ -2,14 +2,14 @@ version = 0.1
 
 [default]
 [default.global.parameters]
-stack_name = "ai-portfolio-dev"
+stack_name = "node-app-dev"
 region = "ap-northeast-2"
 
 [default.deploy.parameters]
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 confirm_changeset = true
 resolve_s3 = true
-s3_prefix = "ai-portfolio-dev"
+s3_prefix = "node-app-dev"
 region = "ap-northeast-2"
 parameter_overrides = "Environment=\"dev\""
 image_repositories = []
