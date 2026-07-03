@@ -3,38 +3,47 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
+  background: #06091A;
 }
 
 .authCard {
   width: 100%;
   max-width: 400px;
   padding: 40px 36px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  background: var(--bg);
-  box-shadow: var(--shadow);
+  background: #090D1F;
 }
 
 .authLogo {
-  text-align: center;
-  font-size: 36px;
-  margin-bottom: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #3B8EF0, #7C5CF0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 auto 14px;
+  box-shadow: 0 0 20px rgba(75, 130, 240, 0.4);
 }
 
 .authTitle {
   text-align: center;
   font-size: 22px;
   font-weight: 700;
-  color: var(--text-h);
+  color: #DDE5F5;
   margin: 0 0 4px;
   letter-spacing: -0.3px;
+  font-family: "Space Grotesk", system-ui, sans-serif;
 }
 
 .authSubtitle {
   text-align: center;
   font-size: 14px;
-  color: var(--text);
+  color: #556070;
   margin: 0 0 28px;
 }
 
@@ -53,39 +62,37 @@
 .label {
   font-size: 13px;
   font-weight: 500;
-  color: var(--text-h);
+  color: #DDE5F5;
 }
 
 .input {
   padding: 10px 14px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   font-size: 15px;
-  background: var(--bg);
-  color: var(--text-h);
+  background: #0D1228;
+  color: #DDE5F5;
   outline: none;
   transition: border-color 0.15s;
-  font-family: var(--sans);
+  font-family: "Space Grotesk", system-ui, sans-serif;
 }
 
 .input:focus {
-  border-color: var(--accent-border);
+  border-color: rgba(59, 142, 240, 0.5);
 }
 
 .input::placeholder {
-  color: var(--text);
-  opacity: 0.5;
+  color: #556070;
 }
 
 .hint {
   font-size: 12px;
-  color: var(--text);
-  opacity: 0.7;
+  color: #556070;
 }
 
 .submitButton {
   padding: 11px 20px;
-  background: var(--accent);
+  background: linear-gradient(135deg, #3B8EF0, #7C5CF0);
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -94,6 +101,7 @@
   cursor: pointer;
   transition: opacity 0.15s;
   margin-top: 4px;
+  font-family: "Space Grotesk", system-ui, sans-serif;
 }
 
 .submitButton:hover:not(:disabled) {
@@ -108,21 +116,21 @@
 .error {
   padding: 10px 14px;
   border-radius: 8px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #dc2626;
+  background: rgba(240, 84, 114, 0.1);
+  border: 1px solid rgba(240, 84, 114, 0.3);
+  color: #F05472;
   font-size: 13px;
 }
 
 .switchRow {
   text-align: center;
   font-size: 14px;
-  color: var(--text);
-  margin-top: 4px;
+  color: #556070;
+  margin-top: 16px;
 }
 
 .switchLink {
-  color: var(--accent);
+  color: #3B8EF0;
   background: none;
   border: none;
   padding: 0;
