@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Plus, Trash2 } from 'lucide-react';
-import { useTasksStore, type Priority } from '../../shared/stores/tasks.store';
+import { CheckCircle2, Circle, Plus, Trash2, Tag, Folder, FolderOpen, ChevronRight } from 'lucide-react';
+import { useTasksStore, type Priority, type Task, type Project } from '../../shared/stores/tasks.store';
 
 const C = {
-  bg1: '#090D1F', bg2: '#0D1228',
+  bg0: '#06091A', bg1: '#090D1F', bg2: '#0D1228', bg3: '#131B32',
   b0: 'rgba(255,255,255,0.04)', b1: 'rgba(255,255,255,0.08)',
   t0: '#DDE5F5', t1: '#556070', t2: '#253040',
-  blue: '#3B8EF0', teal: '#00CCA0', amber: '#EFA020', rose: '#F05472', sky: '#58AEFF',
+  blue: '#3B8EF0', violet: '#7C5CF0', teal: '#00CCA0', amber: '#EFA020', rose: '#F05472', sky: '#58AEFF',
 };
 const font = '"Space Grotesk", system-ui, sans-serif';
 const mono = '"JetBrains Mono", "Fira Code", monospace';
@@ -17,6 +17,13 @@ const PRIORITY_COLOR: Record<Priority, string> = {
 const PRIORITY_LABEL: Record<Priority, string> = {
   urgent: '긴급', high: '높음', medium: '보통', low: '낮음',
 };
+const PROJECT_PALETTE = [C.blue, C.violet, C.teal, C.amber, C.sky, C.rose];
+
+function projColor(projects: Project[], projectId?: string): string {
+  if (!projectId) return C.t2;
+  const idx = projects.findIndex((p) => p.id === projectId);
+  return PROJECT_PALETTE[idx % PROJECT_PALETTE.length] ?? C.sky;
+}
 
 const inputStyle = {
   background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8,
@@ -24,153 +31,430 @@ const inputStyle = {
   outline: 'none', width: '100%', boxSizing: 'border-box' as const,
 };
 
-export function TasksView() {
-  const { items, loading, fetch, add, toggle, remove } = useTasksStore();
-  const [showForm, setShowForm] = useState(false);
+type TabId = 'all' | 'projects' | 'done';
+
+interface TaskRowProps {
+  task: Task;
+  subtasks: Task[];
+  projects: Project[];
+  toggle: (id: string, done: boolean) => void;
+  remove: (id: string) => void;
+  onAddSubtask: (parentId: string) => void;
+  indent?: boolean;
+}
+
+function TaskRow({ task, subtasks, projects, toggle, remove, onAddSubtask, indent }: TaskRowProps) {
+  const [expanded, setExpanded] = useState(true);
+  const hasSubtasks = subtasks.length > 0;
+  const col = projColor(projects, task.projectId);
+
+  return (
+    <>
+      <div style={{
+        background: task.done ? C.bg1 : C.bg2,
+        border: `1px solid ${task.done ? C.b0 : C.b1}`,
+        borderRadius: 10, padding: '11px 14px',
+        display: 'flex', alignItems: 'flex-start', gap: 8, transition: 'all 0.14s',
+        marginLeft: indent ? 22 : 0,
+        borderLeft: indent ? `2px solid ${C.b1}` : undefined,
+      }}>
+        {hasSubtasks && !indent && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            style={{ display: 'flex', alignItems: 'center', flexShrink: 0, marginTop: 2, color: C.t1, cursor: 'pointer' }}
+          >
+            <ChevronRight size={11} style={{ transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+          </button>
+        )}
+        <button
+          onClick={() => toggle(task.id, !task.done)}
+          style={{ display: 'flex', cursor: 'pointer', flexShrink: 0, marginTop: 2 }}
+        >
+          {task.done
+            ? <CheckCircle2 size={15} color={C.teal} style={{ filter: `drop-shadow(0 0 4px ${C.teal}80)` }} />
+            : <Circle size={15} color={C.t2} />
+          }
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{
+            color: task.done ? C.t1 : C.t0, fontSize: 13.5,
+            textDecoration: task.done ? 'line-through' : 'none',
+            display: 'block',
+          }}>{task.title}</span>
+          {(task.projectId || (task.tags ?? []).length > 0 || task.due) && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, alignItems: 'center' }}>
+              {task.projectId && (
+                <span style={{
+                  fontSize: 10, display: 'flex', alignItems: 'center', gap: 3,
+                  color: col, background: `${col}18`, borderRadius: 5, padding: '2px 7px',
+                }}>
+                  <Folder size={8} />
+                  {projects.find((p) => p.id === task.projectId)?.name ?? ''}
+                </span>
+              )}
+              {(task.tags ?? []).map((tag) => (
+                <span key={tag} style={{
+                  fontSize: 10, color: C.violet, background: `${C.violet}18`,
+                  borderRadius: 5, padding: '2px 7px', display: 'flex', alignItems: 'center', gap: 3,
+                }}>
+                  <Tag size={7} />{tag}
+                </span>
+              ))}
+              {task.due && (
+                <span style={{ fontSize: 10, fontFamily: mono, color: C.t2 }}>{task.due}</span>
+              )}
+            </div>
+          )}
+        </div>
+        <span style={{
+          fontSize: 10, fontWeight: 600, flexShrink: 0, marginTop: 2,
+          color: PRIORITY_COLOR[task.priority],
+          background: `${PRIORITY_COLOR[task.priority]}18`,
+          borderRadius: 5, padding: '2px 7px',
+        }}>{PRIORITY_LABEL[task.priority]}</span>
+        {!indent && !task.done && (
+          <button
+            onClick={() => onAddSubtask(task.id)}
+            title="하위 작업 추가"
+            style={{ color: C.t2, cursor: 'pointer', display: 'flex', flexShrink: 0, marginTop: 2 }}
+          >
+            <Plus size={11} />
+          </button>
+        )}
+        <button
+          onClick={() => remove(task.id)}
+          style={{ color: C.t2, cursor: 'pointer', display: 'flex', flexShrink: 0, marginTop: 2 }}
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+      {hasSubtasks && expanded && subtasks.map((sub) => (
+        <TaskRow
+          key={sub.id}
+          task={sub}
+          subtasks={[]}
+          projects={projects}
+          toggle={toggle}
+          remove={remove}
+          onAddSubtask={onAddSubtask}
+          indent
+        />
+      ))}
+    </>
+  );
+}
+
+interface AddTaskFormProps {
+  projects: Project[];
+  parentLabel?: string;
+  onSubmit: (data: { title: string; priority: Priority; due?: string; tags?: string[]; projectId?: string }) => void;
+  onCancel: () => void;
+}
+
+function AddTaskForm({ projects, parentLabel, onSubmit, onCancel }: AddTaskFormProps) {
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
   const [due, setDue] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [projectId, setProjectId] = useState('');
 
-  useEffect(() => { fetch(); }, [fetch]);
-
-  const done = items.filter((t) => t.done).length;
-  const urgent = items.filter((t) => !t.done && t.priority === 'urgent').length;
-
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    await add({ title: title.trim(), priority, due: due || undefined });
-    setTitle(''); setDue(''); setPriority('medium'); setShowForm(false);
+    const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
+    onSubmit({ title: title.trim(), priority, due: due || undefined, tags: tags.length ? tags : undefined, projectId: projectId || undefined });
   };
 
   return (
+    <form
+      onSubmit={handleSubmit}
+      style={{ marginTop: 12, background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}
+    >
+      {parentLabel && (
+        <p style={{ color: C.violet, fontSize: 11.5, marginBottom: -4 }}>하위 작업: {parentLabel}</p>
+      )}
+      <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="할 일 제목" style={inputStyle} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <select
+          value={priority}
+          onChange={(e) => setPriority(e.target.value as Priority)}
+          style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, cursor: 'pointer' }}
+        >
+          {(['urgent', 'high', 'medium', 'low'] as Priority[]).map((p) => (
+            <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>
+          ))}
+        </select>
+        <input type="date" value={due} onChange={(e) => setDue(e.target.value)} style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, colorScheme: 'dark' }} />
+      </div>
+      <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="태그 (쉼표 구분, 예: 업무,중요)" style={inputStyle} />
+      {!parentLabel && projects.length > 0 && (
+        <select
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
+          style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: projectId ? C.t0 : C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer' }}
+        >
+          <option value="">프로젝트 없음</option>
+          {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      )}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="submit" style={{ flex: 1, padding: '9px', background: C.blue, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer' }}>추가</button>
+        <button type="button" onClick={onCancel} style={{ padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
+      </div>
+    </form>
+  );
+}
+
+export function TasksView() {
+  const { items, projects, loading, fetch, add, toggle, remove, addProject, removeProject } = useTasksStore();
+  const [tab, setTab] = useState<TabId>('all');
+  const [showForm, setShowForm] = useState(false);
+  const [addingParentId, setAddingParentId] = useState<string | null>(null);
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({});
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const activeTasks = items.filter((t) => !t.done);
+  const doneTasks = items.filter((t) => t.done);
+  const allTags = Array.from(new Set(items.flatMap((t) => t.tags ?? [])));
+  const urgent = activeTasks.filter((t) => t.priority === 'urgent').length;
+
+  const filteredActive = activeTag
+    ? activeTasks.filter((t) => (t.tags ?? []).includes(activeTag))
+    : activeTasks;
+
+  const topLevel = filteredActive.filter((t) => !t.parentTaskId);
+  const subtasksMap: Record<string, Task[]> = {};
+  filteredActive.filter((t) => t.parentTaskId).forEach((t) => {
+    if (!subtasksMap[t.parentTaskId!]) subtasksMap[t.parentTaskId!] = [];
+    subtasksMap[t.parentTaskId!].push(t);
+  });
+
+  const handleAdd = async (data: { title: string; priority: Priority; due?: string; tags?: string[]; projectId?: string }) => {
+    await add({ ...data, parentTaskId: addingParentId ?? undefined });
+    setShowForm(false);
+    setAddingParentId(null);
+  };
+
+  const openAddSubtask = (parentId: string) => {
+    setAddingParentId(parentId);
+    setShowForm(true);
+  };
+
+  const handleAddProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectName.trim()) return;
+    await addProject({ name: projectName.trim(), status: 'active' });
+    setProjectName(''); setShowProjectForm(false);
+  };
+
+  const toggleProjectCollapse = (id: string) => {
+    setCollapsedProjects((s) => ({ ...s, [id]: !s[id] }));
+  };
+
+  const tabBtn = (id: TabId, label: string) => (
+    <button
+      onClick={() => setTab(id)}
+      style={{
+        padding: '6px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+        fontFamily: font, cursor: 'pointer', transition: 'all 0.14s',
+        background: tab === id ? C.bg3 : 'transparent',
+        border: `1px solid ${tab === id ? C.b1 : 'transparent'}`,
+        color: tab === id ? C.t0 : C.t1,
+      }}
+    >{label}</button>
+  );
+
+  return (
     <div style={{ padding: '26px 28px', fontFamily: font }}>
-      <div style={{ marginBottom: 22 }}>
+      <div style={{ marginBottom: 18 }}>
         <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>할 일</h1>
         <p style={{ color: C.t1, fontSize: 12.5, marginTop: 4 }}>
-          {loading
-            ? '불러오는 중...'
-            : `${items.length}개 중 ${done}개 완료${urgent ? ` · 긴급 ${urgent}개` : ''}`}
+          {loading ? '불러오는 중...' : `${items.length}개 중 ${doneTasks.length}개 완료${urgent ? ` · 긴급 ${urgent}개` : ''}`}
         </p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {items.map((task) => (
-          <div key={task.id} style={{
-            background: task.done ? C.bg1 : C.bg2,
-            border: `1px solid ${task.done ? C.b0 : C.b1}`,
-            borderRadius: 10, padding: '12px 16px',
-            display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.14s',
-          }}>
-            <button
-              onClick={() => toggle(task.id, !task.done)}
-              style={{ display: 'flex', cursor: 'pointer', flexShrink: 0 }}
-            >
-              <CheckCircle2
-                size={16}
-                color={task.done ? C.teal : C.t2}
-                style={{ filter: task.done ? `drop-shadow(0 0 4px ${C.teal}80)` : 'none' }}
-              />
-            </button>
-            <span style={{
-              flex: 1, color: task.done ? C.t1 : C.t0, fontSize: 13.5,
-              textDecoration: task.done ? 'line-through' : 'none',
-            }}>{task.title}</span>
-            {task.due && (
-              <span style={{ fontSize: 10, fontFamily: mono, color: task.done ? C.t2 : C.t1, flexShrink: 0 }}>
-                {task.due}
-              </span>
-            )}
-            <span style={{
-              fontSize: 10, fontWeight: 600, flexShrink: 0,
-              color: PRIORITY_COLOR[task.priority],
-              background: `${PRIORITY_COLOR[task.priority]}18`,
-              borderRadius: 5, padding: '2px 8px',
-            }}>{PRIORITY_LABEL[task.priority]}</span>
-            <button
-              onClick={() => remove(task.id)}
-              style={{ color: C.t2, cursor: 'pointer', display: 'flex', flexShrink: 0 }}
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
-        ))}
-
-        {items.length === 0 && !loading && (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: C.t2, fontSize: 13 }}>
-            할 일이 없어요. 새 항목을 추가해보세요.
-          </div>
-        )}
+      <div style={{
+        display: 'flex', gap: 4, marginBottom: 20,
+        background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 4, width: 'fit-content',
+      }}>
+        {tabBtn('all', '전체')}
+        {tabBtn('projects', `프로젝트 (${projects.length})`)}
+        {tabBtn('done', `완료 (${doneTasks.length})`)}
       </div>
 
-      {showForm ? (
-        <form
-          onSubmit={handleAdd}
-          style={{
-            marginTop: 14, background: C.bg2, border: `1px solid ${C.b1}`,
-            borderRadius: 10, padding: '16px',
-            display: 'flex', flexDirection: 'column', gap: 10,
-          }}
-        >
-          <input
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="할 일 제목"
-            style={inputStyle}
-          />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as Priority)}
-              style={{
-                flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8,
-                padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, cursor: 'pointer',
-              }}
-            >
-              {(['urgent', 'high', 'medium', 'low'] as Priority[]).map((p) => (
-                <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>
+      {/* All tab */}
+      {tab === 'all' && (
+        <>
+          {allTags.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+              <button
+                onClick={() => setActiveTag(null)}
+                style={{
+                  fontSize: 11, padding: '3px 10px', borderRadius: 20, fontFamily: font, cursor: 'pointer',
+                  background: activeTag === null ? `${C.violet}20` : C.bg2,
+                  border: `1px solid ${activeTag === null ? C.violet : C.b1}`,
+                  color: activeTag === null ? C.violet : C.t1,
+                }}
+              >전체</button>
+              {allTags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                  style={{
+                    fontSize: 11, padding: '3px 10px', borderRadius: 20, fontFamily: font, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    background: activeTag === tag ? `${C.violet}20` : C.bg2,
+                    border: `1px solid ${activeTag === tag ? C.violet : C.b1}`,
+                    color: activeTag === tag ? C.violet : C.t1,
+                  }}
+                >
+                  <Tag size={9} />{tag}
+                </button>
               ))}
-            </select>
-            <input
-              type="date"
-              value={due}
-              onChange={(e) => setDue(e.target.value)}
-              style={{
-                flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8,
-                padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font,
-                colorScheme: 'dark',
-              }}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {topLevel.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                subtasks={subtasksMap[task.id] ?? []}
+                projects={projects}
+                toggle={toggle}
+                remove={remove}
+                onAddSubtask={openAddSubtask}
+              />
+            ))}
+            {topLevel.length === 0 && !loading && (
+              <p style={{ color: C.t2, fontSize: 13, padding: '30px 0' }}>
+                {activeTag ? `'${activeTag}' 태그의 할 일이 없습니다.` : '할 일이 없어요. 새 항목을 추가해보세요.'}
+              </p>
+            )}
+          </div>
+
+          {showForm ? (
+            <AddTaskForm
+              projects={projects}
+              parentLabel={addingParentId ? (items.find((t) => t.id === addingParentId)?.title ?? '') : undefined}
+              onSubmit={handleAdd}
+              onCancel={() => { setShowForm(false); setAddingParentId(null); }}
             />
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          ) : (
             <button
-              type="submit"
-              style={{
-                flex: 1, padding: '9px', background: C.blue, color: '#fff',
-                borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer',
-              }}
-            >추가</button>
+              onClick={() => { setAddingParentId(null); setShowForm(true); }}
+              style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}
+            >
+              <Plus size={14} />새 할 일 추가
+            </button>
+          )}
+        </>
+      )}
+
+      {/* Projects tab */}
+      {tab === 'projects' && (
+        <>
+          {[...projects.map((p) => ({ ...p })), { id: '', name: '프로젝트 없음', color: undefined, status: 'active' as const }].map((proj) => {
+            const projTasks = activeTasks.filter((t) => (t.projectId ?? '') === proj.id && !t.parentTaskId);
+            if (projTasks.length === 0 && proj.id === '') return null;
+            const col = proj.id ? projColor(projects, proj.id) : C.t2;
+            const isCollapsed = collapsedProjects[proj.id || '_none'] ?? false;
+            return (
+              <div key={proj.id || '_none'} style={{ marginBottom: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <button
+                    onClick={() => toggleProjectCollapse(proj.id || '_none')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', flex: 1 }}
+                  >
+                    {proj.id ? <FolderOpen size={14} color={col} /> : <Folder size={14} color={C.t2} />}
+                    <span style={{ color: col, fontSize: 13.5, fontWeight: 600 }}>{proj.name}</span>
+                    <span style={{ color: C.t2, fontSize: 11, fontFamily: mono }}>({projTasks.length})</span>
+                    <ChevronRight size={11} color={C.t2} style={{ transform: isCollapsed ? 'none' : 'rotate(90deg)', transition: 'transform 0.15s', marginLeft: 2 }} />
+                  </button>
+                  {proj.id && (
+                    <button onClick={() => removeProject(proj.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex' }}>
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
+                {!isCollapsed && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 4 }}>
+                    {projTasks.map((task) => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        subtasks={subtasksMap[task.id] ?? []}
+                        projects={projects}
+                        toggle={toggle}
+                        remove={remove}
+                        onAddSubtask={openAddSubtask}
+                      />
+                    ))}
+                    {projTasks.length === 0 && (
+                      <p style={{ color: C.t2, fontSize: 12, paddingLeft: 20 }}>할 일 없음</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {showProjectForm ? (
+            <form onSubmit={handleAddProject} style={{ marginBottom: 12, background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '14px', display: 'flex', gap: 8 }}>
+              <input autoFocus value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="프로젝트 이름" style={{ ...inputStyle, marginBottom: 0 }} />
+              <button type="submit" style={{ padding: '9px 16px', background: C.blue, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer', whiteSpace: 'nowrap' }}>추가</button>
+              <button type="button" onClick={() => setShowProjectForm(false)} style={{ padding: '9px 14px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
+            </form>
+          ) : (
+            <button onClick={() => setShowProjectForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}>
+              <Plus size={14} />새 프로젝트
+            </button>
+          )}
+
+          {showForm ? (
+            <AddTaskForm
+              projects={projects}
+              parentLabel={addingParentId ? (items.find((t) => t.id === addingParentId)?.title ?? '') : undefined}
+              onSubmit={handleAdd}
+              onCancel={() => { setShowForm(false); setAddingParentId(null); }}
+            />
+          ) : (
             <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              style={{
-                padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`,
-                color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer',
-              }}
-            >취소</button>
-          </div>
-        </form>
-      ) : (
-        <button
-          onClick={() => setShowForm(true)}
-          style={{
-            marginTop: 14, display: 'flex', alignItems: 'center', gap: 7,
-            color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0',
-          }}
-        >
-          <Plus size={14} />새 할 일 추가
-        </button>
+              onClick={() => { setAddingParentId(null); setShowForm(true); }}
+              style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}
+            >
+              <Plus size={14} />새 할 일 추가
+            </button>
+          )}
+        </>
+      )}
+
+      {/* Done tab */}
+      {tab === 'done' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {doneTasks.map((task) => (
+            <div key={task.id} style={{
+              background: C.bg1, border: `1px solid ${C.b0}`, borderRadius: 10,
+              padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <button onClick={() => toggle(task.id, false)} style={{ display: 'flex', cursor: 'pointer', flexShrink: 0 }}>
+                <CheckCircle2 size={15} color={C.teal} style={{ filter: `drop-shadow(0 0 4px ${C.teal}80)` }} />
+              </button>
+              <span style={{ flex: 1, color: C.t1, fontSize: 13.5, textDecoration: 'line-through' }}>{task.title}</span>
+              {task.due && <span style={{ fontSize: 10, fontFamily: mono, color: C.t2 }}>{task.due}</span>}
+              <button onClick={() => remove(task.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex' }}>
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
+          {doneTasks.length === 0 && (
+            <p style={{ color: C.t2, fontSize: 13, padding: '30px 0' }}>완료된 할 일이 없습니다.</p>
+          )}
+        </div>
       )}
     </div>
   );

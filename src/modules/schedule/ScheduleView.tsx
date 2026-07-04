@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Clock, Plus, Trash2 } from 'lucide-react';
-import { useEventsStore } from '../../shared/stores/events.store';
+import { Clock, Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { useEventsStore, type CalendarEvent } from '../../shared/stores/events.store';
 
 const C = {
   bg1: '#090D1F', bg2: '#0D1228',
@@ -37,6 +37,28 @@ function getWeekDays(): string[] {
   });
 }
 
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + (m ?? 0);
+}
+
+function detectConflicts(events: CalendarEvent[]): Set<string> {
+  const conflictIds = new Set<string>();
+  const withTime = events.filter((e) => e.time);
+  for (let i = 0; i < withTime.length; i++) {
+    for (let j = i + 1; j < withTime.length; j++) {
+      const a = withTime[i];
+      const b = withTime[j];
+      const diff = Math.abs(timeToMinutes(a.time!) - timeToMinutes(b.time!));
+      if (diff < 60) {
+        conflictIds.add(a.id);
+        conflictIds.add(b.id);
+      }
+    }
+  }
+  return conflictIds;
+}
+
 export function ScheduleView() {
   const { items, loading, fetch, add, remove } = useEventsStore();
   const todayStr = new Date().toISOString().split('T')[0];
@@ -56,6 +78,9 @@ export function ScheduleView() {
   const selectedEvents = items
     .filter((e) => e.date === selectedDate)
     .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
+
+  const conflictIds = detectConflicts(selectedEvents);
+  const hasConflicts = conflictIds.size > 0;
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +105,7 @@ export function ScheduleView() {
           const isToday = d === todayStr;
           const isSelected = d === selectedDate;
           const count = items.filter((e) => e.date === d).length;
+          const dayConflicts = detectConflicts(items.filter((e) => e.date === d));
           return (
             <button
               key={d}
@@ -88,9 +114,15 @@ export function ScheduleView() {
                 flex: 1, padding: '10px 4px', borderRadius: 10, cursor: 'pointer',
                 background: isSelected ? `${C.blue}20` : C.bg2,
                 border: `1px solid ${isSelected ? C.blue : isToday ? `${C.blue}40` : C.b1}`,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'relative',
               }}
             >
+              {dayConflicts.size > 0 && (
+                <div style={{
+                  position: 'absolute', top: 4, right: 4,
+                  width: 6, height: 6, borderRadius: '50%', background: C.amber,
+                }} />
+              )}
               <span style={{ fontSize: 10, color: isSelected ? C.blue : C.t1 }}>
                 {DAY_KO[(jsDate.getDay())]}
               </span>
@@ -106,11 +138,25 @@ export function ScheduleView() {
         })}
       </div>
 
-      {/* Events for selected date */}
+      {/* Selected date events */}
       <div style={{ marginBottom: 16 }}>
         <p style={{ color: C.t1, fontSize: 11.5, marginBottom: 10, fontFamily: mono }}>
           {selectedDate === todayStr ? '오늘 · ' : ''}{selectedDate}
         </p>
+
+        {/* Conflict warning */}
+        {hasConflicts && (
+          <div style={{
+            background: `${C.amber}12`, border: `1px solid ${C.amber}30`,
+            borderRadius: 8, padding: '10px 14px', marginBottom: 12,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <AlertTriangle size={13} color={C.amber} />
+            <p style={{ color: C.amber, fontSize: 12 }}>
+              시간이 겹치는 일정이 있습니다. 일정을 확인해보세요.
+            </p>
+          </div>
+        )}
 
         {selectedEvents.length === 0 ? (
           <p style={{ color: C.t2, fontSize: 13, padding: '20px 0' }}>일정이 없습니다.</p>
@@ -118,15 +164,20 @@ export function ScheduleView() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {selectedEvents.map((ev) => {
               const col = CATEGORY_COLOR[ev.category ?? 'other'] ?? CATEGORY_COLOR.other;
+              const isConflict = conflictIds.has(ev.id);
               return (
                 <div key={ev.id} style={{
-                  background: C.bg2, border: `1px solid ${C.b1}`,
+                  background: C.bg2,
+                  border: `1px solid ${isConflict ? C.amber + '50' : C.b1}`,
                   borderRadius: 10, padding: '12px 16px',
                   display: 'flex', alignItems: 'center', gap: 12,
                 }}>
                   <div style={{ width: 3, minHeight: 32, borderRadius: 2, background: col, flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
-                    <p style={{ color: C.t0, fontSize: 13.5 }}>{ev.title}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <p style={{ color: C.t0, fontSize: 13.5 }}>{ev.title}</p>
+                      {isConflict && <AlertTriangle size={11} color={C.amber} />}
+                    </div>
                     {ev.time && (
                       <p style={{ color: C.t1, fontSize: 11.5, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                         <Clock size={10} />{ev.time}
@@ -167,24 +218,10 @@ export function ScheduleView() {
             style={inputStyle}
           />
           <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, colorScheme: 'dark' }}
-            />
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, colorScheme: 'dark' }}
-            />
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, colorScheme: 'dark' }} />
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, colorScheme: 'dark' }} />
           </div>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, cursor: 'pointer' }}
-          >
+          <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>
             {Object.entries(CATEGORY_LABEL).map(([val, label]) => (
               <option key={val} value={val}>{label}</option>
             ))}
