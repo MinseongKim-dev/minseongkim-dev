@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import { useToastStore } from './toast.store';
 
 export interface Workout {
   id: string;
@@ -27,18 +28,27 @@ export const useHealthStore = create<HealthStore>((set) => ({
     try {
       const items = await api.get<Workout[]>('/workouts');
       set({ items: items ?? [] });
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '건강 데이터를 불러오지 못했습니다');
     } finally {
       set({ loading: false });
     }
   },
 
   add: async (data) => {
-    const item = await api.post<Workout>('/workouts', data);
-    set((s) => ({ items: [item, ...s.items] }));
+    try {
+      const item = await api.post<Workout>('/workouts', data);
+      set((s) => ({ items: [item, ...s.items] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '운동 기록 추가에 실패했습니다');
+      throw err;
+    }
   },
 
   remove: async (id) => {
     set((s) => ({ items: s.items.filter((w) => w.id !== id) }));
-    await api.delete<unknown>(`/workouts/${id}`);
+    await api.delete<unknown>(`/workouts/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
   },
 }));

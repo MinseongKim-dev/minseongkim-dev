@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import { useToastStore } from './toast.store';
 
 export interface Assessment {
   dimension: string;
@@ -87,7 +88,7 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
         });
       }
     } catch {
-      // no target yet
+      // no target yet — expected on first visit
     } finally {
       set({ loading: false });
     }
@@ -98,6 +99,9 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
     try {
       const target = await api.post<CareerTarget>('/career/coach/profile', { title, context });
       set({ target });
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : 'AI 분석에 실패했습니다');
+      throw err;
     } finally {
       set({ aiLoading: false });
     }
@@ -117,6 +121,9 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
           ? { ...s.target, currentAssessment: result.assessments, overallReadiness: result.overallReadiness, status: 'active' }
           : null,
       }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '역량 평가에 실패했습니다');
+      throw err;
     } finally {
       set({ aiLoading: false });
     }
@@ -129,6 +136,9 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
     try {
       const paths = await api.post<CareerPath[]>('/career/coach/paths', { targetId: target.id });
       set({ paths: paths ?? [] });
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '커리어 경로 생성에 실패했습니다');
+      throw err;
     } finally {
       set({ aiLoading: false });
     }
@@ -144,6 +154,9 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
         target: s.target ? { ...s.target, selectedPathId: pathId } : null,
         paths: s.paths.map((p) => ({ ...p, isSelected: p.id === pathId })),
       }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '경로 선택에 실패했습니다');
+      throw err;
     } finally {
       set({ aiLoading: false });
     }
@@ -156,6 +169,9 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
     try {
       const logs = await api.post<CoachLog[]>(`/career/coach/coaching/${target.id}`, {});
       set((s) => ({ coachLogs: [...(logs ?? []), ...s.coachLogs].slice(0, 10) }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '코칭 실행에 실패했습니다');
+      throw err;
     } finally {
       set({ aiLoading: false });
     }
