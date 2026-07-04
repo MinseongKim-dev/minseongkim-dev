@@ -434,7 +434,6 @@ Resources:
         Aliases: !If
           - HasCustomDomain
           - - !Ref DomainName
-            - !Sub "www.${DomainName}"
           - !Ref AWS::NoValue
         ViewerCertificate: !If
           - HasCustomDomain
