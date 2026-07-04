@@ -1,6 +1,7 @@
-import { Bell, MessageCircle } from 'lucide-react';
+import { Bell, MessageCircle, Menu } from 'lucide-react';
 import { useAppStore } from '../stores/app.store';
 import { useAuth } from '../../contexts/useAuth';
+import { useWindowSize } from '../hooks/useWindowSize';
 import { NAV } from './Sidebar';
 
 const C = {
@@ -11,9 +12,10 @@ const C = {
 };
 const font = '"Space Grotesk", system-ui, sans-serif';
 
-export function Header() {
+export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const { view, chatOpen, toggleChat } = useAppStore();
   const { user } = useAuth();
+  const { isMobile } = useWindowSize();
   const domain = NAV.find((n) => n.id === view);
   const email = user?.signInDetails?.loginId ?? '';
   const avatarLetter = (email.charAt(0) || 'N').toUpperCase();
@@ -23,6 +25,14 @@ export function Header() {
       height: 52, padding: '0 24px', display: 'flex', alignItems: 'center',
       borderBottom: `1px solid ${C.b0}`, background: C.bg0, flexShrink: 0,
     }}>
+      {isMobile && (
+        <button
+          onClick={onMenuClick}
+          style={{ color: C.t1, cursor: 'pointer', display: 'flex', marginRight: 14 }}
+        >
+          <Menu size={18} />
+        </button>
+      )}
       {domain && (
         <span style={{ marginRight: 8, display: 'flex' }}>
           <domain.Icon size={14} color={domain.color} />
@@ -39,16 +49,18 @@ export function Header() {
             borderRadius: '50%', background: C.rose, border: `1.5px solid ${C.bg0}`,
           }} />
         </button>
-        <button onClick={toggleChat} style={{
-          display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
-          background: chatOpen ? `${C.blue}20` : C.bg2,
-          border: `1px solid ${chatOpen ? C.blue : C.b1}`,
-          borderRadius: 20, color: chatOpen ? C.blue : C.t1,
-          fontSize: 12, cursor: 'pointer', fontFamily: font,
-        }}>
-          <MessageCircle size={12} />
-          AI 채팅
-        </button>
+        {!isMobile && (
+          <button onClick={toggleChat} style={{
+            display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
+            background: chatOpen ? `${C.blue}20` : C.bg2,
+            border: `1px solid ${chatOpen ? C.blue : C.b1}`,
+            borderRadius: 20, color: chatOpen ? C.blue : C.t1,
+            fontSize: 12, cursor: 'pointer', fontFamily: font,
+          }}>
+            <MessageCircle size={12} />
+            AI 채팅
+          </button>
+        )}
         <div style={{
           width: 28, height: 28, borderRadius: '50%',
           background: `linear-gradient(135deg,${C.blue},${C.violet})`,
