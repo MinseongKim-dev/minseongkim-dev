@@ -25,6 +25,17 @@ export interface Achievement {
   tags?: string[];
 }
 
+export type GoalHorizon = 'short' | 'mid' | 'long';
+
+export interface CareerGoal {
+  id: string;
+  title: string;
+  horizon: GoalHorizon;
+  targetDate?: string;
+  status: 'active' | 'completed' | 'paused';
+  notes?: string;
+}
+
 export interface Assessment {
   dimension: string;
   score: number;
@@ -79,6 +90,7 @@ interface CareerStore {
   coachLogs: CoachLog[];
   skills: Skill[];
   achievements: Achievement[];
+  careerGoals: CareerGoal[];
   loading: boolean;
   aiLoading: boolean;
   fetch: () => Promise<void>;
@@ -91,6 +103,9 @@ interface CareerStore {
   removeSkill: (id: string) => Promise<void>;
   addAchievement: (data: Omit<Achievement, 'id'>) => Promise<void>;
   removeAchievement: (id: string) => Promise<void>;
+  addCareerGoal: (data: Omit<CareerGoal, 'id'>) => Promise<void>;
+  updateCareerGoal: (id: string, data: Partial<CareerGoal>) => Promise<void>;
+  removeCareerGoal: (id: string) => Promise<void>;
 }
 
 export const useCareerStore = create<CareerStore>((set, get) => ({
@@ -99,19 +114,21 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
   coachLogs: [],
   skills: [],
   achievements: [],
+  careerGoals: [],
   loading: false,
   aiLoading: false,
 
   fetch: async () => {
     set({ loading: true });
     try {
-      const [targets, skills, achievements] = await Promise.all([
+      const [targets, skills, achievements, careerGoals] = await Promise.all([
         api.get<CareerTarget[]>('/targets'),
         api.get<Skill[]>('/skills').catch(() => []),
         api.get<Achievement[]>('/achievements').catch(() => []),
+        api.get<CareerGoal[]>('/career-goals').catch(() => []),
       ]);
       const active = (targets ?? []).find((t) => t.status !== 'completed') ?? (targets ?? [])[0] ?? null;
-      set({ target: active ?? null, skills: skills ?? [], achievements: achievements ?? [] });
+      set({ target: active ?? null, skills: skills ?? [], achievements: achievements ?? [], careerGoals: careerGoals ?? [] });
       if (active) {
         const [paths, logs] = await Promise.all([
           api.get<CareerPath[]>('/cpaths').catch(() => []),
@@ -242,6 +259,30 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
   removeAchievement: async (id) => {
     set((s) => ({ achievements: s.achievements.filter((a) => a.id !== id) }));
     await api.delete<unknown>(`/achievements/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
+  },
+
+  addCareerGoal: async (data) => {
+    try {
+      const item = await api.post<CareerGoal>('/career-goals', data);
+      set((s) => ({ careerGoals: [item, ...s.careerGoals] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '목표 추가에 실패했습니다');
+      throw err;
+    }
+  },
+
+  updateCareerGoal: async (id, data) => {
+    set((s) => ({ careerGoals: s.careerGoals.map((g) => (g.id === id ? { ...g, ...data } : g)) }));
+    await api.put<CareerGoal>(`/career-goals/${id}`, data).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '업데이트에 실패했습니다');
+    });
+  },
+
+  removeCareerGoal: async (id) => {
+    set((s) => ({ careerGoals: s.careerGoals.filter((g) => g.id !== id) }));
+    await api.delete<unknown>(`/career-goals/${id}`).catch((err) => {
       useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
     });
   },
