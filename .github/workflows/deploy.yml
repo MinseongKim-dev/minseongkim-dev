@@ -70,13 +70,52 @@ jobs:
         working-directory: infrastructure
         run: sam build
 
+      - name: Get current CloudFront URL (for AllowedOrigin)
+        id: get_cf_url
+        run: |
+          CF_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
+            --output text 2>/dev/null) || true
+          if [ -z "$CF_URL" ] || [ "$CF_URL" = "None" ]; then
+            CF_URL="*"
+          fi
+          echo "cf_url=$CF_URL" >> $GITHUB_OUTPUT
+
       - name: SAM Deploy
         working-directory: infrastructure
-        run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
+        run: |
+          sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              "Environment=dev" \
+              "AllowedOrigin=${{ steps.get_cf_url.outputs.cf_url }}"
+
+      - name: Update CORS to CloudFront URL (post-deploy)
+        run: |
+          # After deploy the CloudFront distribution definitely exists — lock down CORS
+          CF_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
+            --output text)
+          PREV_URL="${{ steps.get_cf_url.outputs.cf_url }}"
+          if [ "$CF_URL" != "$PREV_URL" ] && [ -n "$CF_URL" ] && [ "$CF_URL" != "None" ]; then
+            echo "Updating AllowedOrigin from '$PREV_URL' to '$CF_URL'"
+            cd infrastructure
+            sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
+              --parameter-overrides \
+                "Environment=dev" \
+                "AllowedOrigin=$CF_URL"
+          else
+            echo "AllowedOrigin already correct: $CF_URL"
+          fi
 
   deploy-frontend:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
+    # Wait for deploy-backend when it runs; skip if backend failed
+    needs: [detect-changes, deploy-backend]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.frontend == 'true' &&
+      (needs.deploy-backend.result == 'success' || needs.deploy-backend.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
