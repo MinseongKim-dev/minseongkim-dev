@@ -273,7 +273,7 @@ export function DashboardView() {
   ].slice(0, 3);
 
   return (
-    <div style={{ padding: '26px 28px', maxWidth: 860, fontFamily: font }}>
+    <div style={{ padding: '26px 28px', fontFamily: font }}>
       {/* Greeting */}
       <div style={{ marginBottom: 22 }}>
         <div style={{ color: C.t1, fontSize: 11, fontFamily: mono, marginBottom: 5 }}>{todayFmt}</div>
@@ -325,7 +325,7 @@ export function DashboardView() {
       )}
 
       {/* Domain grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 11 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 11 }}>
         {DOMAIN_CARDS.map((card) => (
           <DomainCard key={card.id} card={card} onClick={() => setView(card.id)} />
         ))}
