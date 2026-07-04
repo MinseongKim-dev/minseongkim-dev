@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import { useToastStore } from './toast.store';
 
 export interface LearningGoal {
   id: string;
@@ -44,33 +45,51 @@ export const useLearningStore = create<LearningStore>((set) => ({
         api.get<Book[]>('/books'),
       ]);
       set({ goals: goals ?? [], books: books ?? [] });
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '학습 데이터를 불러오지 못했습니다');
     } finally {
       set({ loading: false });
     }
   },
 
   addGoal: async (data) => {
-    const item = await api.post<LearningGoal>('/learning', data);
-    set((s) => ({ goals: [item, ...s.goals] }));
+    try {
+      const item = await api.post<LearningGoal>('/learning', data);
+      set((s) => ({ goals: [item, ...s.goals] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '목표 추가에 실패했습니다');
+      throw err;
+    }
   },
 
   updateGoal: async (id, data) => {
     set((s) => ({ goals: s.goals.map((g) => (g.id === id ? { ...g, ...data } : g)) }));
-    await api.put<LearningGoal>(`/learning/${id}`, data);
+    await api.put<LearningGoal>(`/learning/${id}`, data).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '업데이트에 실패했습니다');
+    });
   },
 
   removeGoal: async (id) => {
     set((s) => ({ goals: s.goals.filter((g) => g.id !== id) }));
-    await api.delete<unknown>(`/learning/${id}`);
+    await api.delete<unknown>(`/learning/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
   },
 
   addBook: async (data) => {
-    const item = await api.post<Book>('/books', data);
-    set((s) => ({ books: [item, ...s.books] }));
+    try {
+      const item = await api.post<Book>('/books', data);
+      set((s) => ({ books: [item, ...s.books] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '도서 추가에 실패했습니다');
+      throw err;
+    }
   },
 
   removeBook: async (id) => {
     set((s) => ({ books: s.books.filter((b) => b.id !== id) }));
-    await api.delete<unknown>(`/books/${id}`);
+    await api.delete<unknown>(`/books/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
   },
 }));

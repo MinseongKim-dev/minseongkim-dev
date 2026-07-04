@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import { useToastStore } from './toast.store';
 
 export interface Contact {
   id: string;
@@ -26,18 +27,27 @@ export const useRelationshipsStore = create<RelationshipsStore>((set) => ({
     try {
       const items = await api.get<Contact[]>('/contacts');
       set({ items: items ?? [] });
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '인간관계 데이터를 불러오지 못했습니다');
     } finally {
       set({ loading: false });
     }
   },
 
   add: async (data) => {
-    const item = await api.post<Contact>('/contacts', data);
-    set((s) => ({ items: [item, ...s.items] }));
+    try {
+      const item = await api.post<Contact>('/contacts', data);
+      set((s) => ({ items: [item, ...s.items] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '연락처 추가에 실패했습니다');
+      throw err;
+    }
   },
 
   remove: async (id) => {
     set((s) => ({ items: s.items.filter((c) => c.id !== id) }));
-    await api.delete<unknown>(`/contacts/${id}`);
+    await api.delete<unknown>(`/contacts/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
   },
 }));

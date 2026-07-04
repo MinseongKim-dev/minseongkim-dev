@@ -1,16 +1,19 @@
+import { lazy, Suspense } from 'react';
 import { AuthGuard } from './components/Auth/AuthGuard';
 import { Sidebar } from './shared/layout/Sidebar';
 import { Header } from './shared/layout/Header';
 import { ChatPanel } from './shared/ui/ChatPanel';
-import { DashboardView } from './modules/dashboard/DashboardView';
-import { TasksView } from './modules/tasks/TasksView';
-import { CareerView } from './modules/career/CareerView';
-import { ScheduleView } from './modules/schedule/ScheduleView';
-import { FinanceView } from './modules/finance/FinanceView';
-import { HealthView } from './modules/health/HealthView';
-import { LearningView } from './modules/learning/LearningView';
-import { RelationshipsView } from './modules/relationships/RelationshipsView';
+import { ToastContainer } from './shared/ui/ToastContainer';
 import { useAppStore } from './shared/stores/app.store';
+
+const DashboardView   = lazy(() => import('./modules/dashboard/DashboardView').then((m) => ({ default: m.DashboardView })));
+const TasksView       = lazy(() => import('./modules/tasks/TasksView').then((m) => ({ default: m.TasksView })));
+const CareerView      = lazy(() => import('./modules/career/CareerView').then((m) => ({ default: m.CareerView })));
+const ScheduleView    = lazy(() => import('./modules/schedule/ScheduleView').then((m) => ({ default: m.ScheduleView })));
+const FinanceView     = lazy(() => import('./modules/finance/FinanceView').then((m) => ({ default: m.FinanceView })));
+const HealthView      = lazy(() => import('./modules/health/HealthView').then((m) => ({ default: m.HealthView })));
+const LearningView    = lazy(() => import('./modules/learning/LearningView').then((m) => ({ default: m.LearningView })));
+const RelationshipsView = lazy(() => import('./modules/relationships/RelationshipsView').then((m) => ({ default: m.RelationshipsView })));
 
 function NodeApp() {
   const { view, chatOpen } = useAppStore();
@@ -21,17 +24,20 @@ function NodeApp() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Header />
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {view === 'dashboard' && <DashboardView />}
-          {view === 'schedule'  && <ScheduleView />}
-          {view === 'tasks'     && <TasksView />}
-          {view === 'finance'   && <FinanceView />}
-          {view === 'health'    && <HealthView />}
-          {view === 'learning'  && <LearningView />}
-          {view === 'career'    && <CareerView />}
-          {view === 'relations' && <RelationshipsView />}
+          <Suspense fallback={null}>
+            {view === 'dashboard' && <DashboardView />}
+            {view === 'schedule'  && <ScheduleView />}
+            {view === 'tasks'     && <TasksView />}
+            {view === 'finance'   && <FinanceView />}
+            {view === 'health'    && <HealthView />}
+            {view === 'learning'  && <LearningView />}
+            {view === 'career'    && <CareerView />}
+            {view === 'relations' && <RelationshipsView />}
+          </Suspense>
         </div>
       </div>
       {chatOpen && <ChatPanel />}
+      <ToastContainer />
     </div>
   );
 }

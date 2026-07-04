@@ -3,7 +3,7 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer,
 } from 'recharts';
 import { ChevronRight, Loader, Zap, Target, Brain, GitBranch, RefreshCw } from 'lucide-react';
-import { useCareerStore, type CareerTarget, type CareerPath, type Assessment } from '../../shared/stores/career.store';
+import { useCareerStore, type CareerTarget, type CareerPath, type CoachLog } from '../../shared/stores/career.store';
 
 const C = {
   bg2: '#0D1228', bg3: '#131B32',
@@ -305,7 +305,7 @@ function PathsView({ paths, onSelect, aiLoading }: {
 function CoachingView({ target, paths, coachLogs, onRunCoaching, aiLoading }: {
   target: CareerTarget;
   paths: CareerPath[];
-  coachLogs: ReturnType<typeof useCareerStore>['coachLogs'];
+  coachLogs: CoachLog[];
   onRunCoaching: () => void;
   aiLoading: boolean;
 }) {
