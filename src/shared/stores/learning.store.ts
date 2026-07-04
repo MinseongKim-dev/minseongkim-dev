@@ -20,9 +20,18 @@ export interface Book {
   progress?: number;
 }
 
+export interface StudyLog {
+  id: string;
+  subject: string;
+  duration: number; // minutes
+  date: string;
+  notes?: string;
+}
+
 interface LearningStore {
   goals: LearningGoal[];
   books: Book[];
+  studyLogs: StudyLog[];
   loading: boolean;
   fetch: () => Promise<void>;
   addGoal: (data: Omit<LearningGoal, 'id'>) => Promise<void>;
@@ -30,21 +39,25 @@ interface LearningStore {
   removeGoal: (id: string) => Promise<void>;
   addBook: (data: Omit<Book, 'id'>) => Promise<void>;
   removeBook: (id: string) => Promise<void>;
+  addStudyLog: (data: Omit<StudyLog, 'id'>) => Promise<void>;
+  removeStudyLog: (id: string) => Promise<void>;
 }
 
 export const useLearningStore = create<LearningStore>((set) => ({
   goals: [],
   books: [],
+  studyLogs: [],
   loading: false,
 
   fetch: async () => {
     set({ loading: true });
     try {
-      const [goals, books] = await Promise.all([
+      const [goals, books, studyLogs] = await Promise.all([
         api.get<LearningGoal[]>('/learning'),
         api.get<Book[]>('/books'),
+        api.get<StudyLog[]>('/study'),
       ]);
-      set({ goals: goals ?? [], books: books ?? [] });
+      set({ goals: goals ?? [], books: books ?? [], studyLogs: studyLogs ?? [] });
     } catch (err) {
       useToastStore.getState().add(err instanceof Error ? err.message : '학습 데이터를 불러오지 못했습니다');
     } finally {
@@ -89,6 +102,23 @@ export const useLearningStore = create<LearningStore>((set) => ({
   removeBook: async (id) => {
     set((s) => ({ books: s.books.filter((b) => b.id !== id) }));
     await api.delete<unknown>(`/books/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
+  },
+
+  addStudyLog: async (data) => {
+    try {
+      const item = await api.post<StudyLog>('/study', data);
+      set((s) => ({ studyLogs: [item, ...s.studyLogs] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '학습 기록 추가에 실패했습니다');
+      throw err;
+    }
+  },
+
+  removeStudyLog: async (id) => {
+    set((s) => ({ studyLogs: s.studyLogs.filter((l) => l.id !== id) }));
+    await api.delete<unknown>(`/study/${id}`).catch((err) => {
       useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
     });
   },

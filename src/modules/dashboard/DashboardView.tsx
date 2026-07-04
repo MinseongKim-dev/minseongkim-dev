@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Calendar, CheckSquare, DollarSign, Activity,
-  BookOpen, Briefcase, Users, Zap, AlertTriangle,
+  BookOpen, Briefcase, Users, Zap, AlertTriangle, Sparkles,
 } from 'lucide-react';
 import { useAppStore, type ViewId } from '../../shared/stores/app.store';
 import { useTasksStore } from '../../shared/stores/tasks.store';
@@ -10,6 +10,7 @@ import { useFinanceStore } from '../../shared/stores/finance.store';
 import { useHealthStore } from '../../shared/stores/health.store';
 import { useLearningStore } from '../../shared/stores/learning.store';
 import { useRelationshipsStore } from '../../shared/stores/relationships.store';
+import { useBriefingStore } from '../../shared/stores/briefing.store';
 
 const C = {
   bg2: '#0D1228', bg3: '#131B32',
@@ -81,6 +82,10 @@ function DomainCard({ card, onClick }: { card: CardConfig; onClick: () => void }
   );
 }
 
+const HIGHLIGHT_COLORS: Record<string, string> = {
+  schedule: C.blue, task: C.violet, finance: C.amber, health: C.teal, career: '#9B7CF5',
+};
+
 export function DashboardView() {
   const { setView } = useAppStore();
   const { items: tasks, fetch: fetchTasks } = useTasksStore();
@@ -89,6 +94,7 @@ export function DashboardView() {
   const { items: workouts, fetch: fetchWorkouts } = useHealthStore();
   const { goals, books, fetch: fetchLearning } = useLearningStore();
   const { items: contacts, fetch: fetchContacts } = useRelationshipsStore();
+  const { item: briefing, fetch: fetchBriefing } = useBriefingStore();
 
   useEffect(() => {
     fetchTasks();
@@ -97,7 +103,8 @@ export function DashboardView() {
     fetchWorkouts();
     fetchLearning();
     fetchContacts();
-  }, [fetchTasks, fetchEvents, fetchTransactions, fetchWorkouts, fetchLearning, fetchContacts]);
+    fetchBriefing();
+  }, [fetchTasks, fetchEvents, fetchTransactions, fetchWorkouts, fetchLearning, fetchContacts, fetchBriefing]);
 
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
@@ -147,7 +154,7 @@ export function DashboardView() {
     ) > 30;
   });
 
-  // Domain cards (dynamic)
+  // Domain cards
   const DOMAIN_CARDS: CardConfig[] = [
     {
       id: 'schedule',
@@ -234,7 +241,7 @@ export function DashboardView() {
     },
   ];
 
-  // Alert bar — health first, then urgent tasks
+  // Alert bar
   const alertItem: { msg: string; view: ViewId } | null =
     daysSinceWorkout >= 3
       ? {
@@ -250,14 +257,14 @@ export function DashboardView() {
         }
       : null;
 
-  // Briefing text
+  // Fallback local briefing text (when no AI briefing exists)
   const briefingParts: string[] = [];
   if (todayEvents.length > 0) briefingParts.push(`오늘 일정 ${todayEvents.length}개`);
   if (urgentTasks.length > 0) briefingParts.push(`긴급 태스크 ${urgentTasks.length}개`);
   if (daysSinceWorkout >= 3 && daysSinceWorkout !== Infinity) briefingParts.push(`${daysSinceWorkout}일 운동 없음`);
   if (overdueContacts.length > 0) briefingParts.push(`연락 필요 ${overdueContacts.length}명`);
 
-  const briefingText = briefingParts.length === 0
+  const fallbackText = briefingParts.length === 0
     ? '오늘은 특별히 주의해야 할 항목이 없어요. 여유롭게 학습이나 계획에 집중해보세요 ✨'
     : `${briefingParts.join(', ')}가 있어요.${
         urgentTasks[0]
@@ -267,10 +274,10 @@ export function DashboardView() {
           : ''
       }`;
 
-  const briefingChips = [
-    ...todayEvents.slice(0, 2).map((e) => `${e.time ? e.time + ' ' : ''}${e.title}`),
-    ...(daysSinceWorkout >= 1 && daysSinceWorkout < Infinity ? ['운동 추천'] : []),
-  ].slice(0, 3);
+  const hasAiBriefing = !!briefing?.briefing;
+  const aiBriefing = briefing?.briefing;
+  const briefingDate = briefing?.date;
+  const isToday = briefingDate === todayStr;
 
   return (
     <div style={{ padding: '26px 28px', fontFamily: font }}>
@@ -280,29 +287,88 @@ export function DashboardView() {
         <h1 style={{ color: C.t0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.4px' }}>안녕하세요 👋</h1>
       </div>
 
-      {/* AI Briefing */}
+      {/* AI Briefing Card */}
       <div style={{
         background: C.bg2, border: `1px solid ${C.b1}`, borderLeft: `3px solid ${C.blue}`,
         borderRadius: 12, padding: '16px 18px', marginBottom: 16,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
-          <Zap size={12} color={C.blue} />
+          {hasAiBriefing && isToday
+            ? <Sparkles size={12} color={C.blue} />
+            : <Zap size={12} color={C.blue} />}
           <span style={{ color: C.blue, fontSize: 10.5, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase' }}>
             오늘의 브리핑
           </span>
+          {hasAiBriefing && (
+            <span style={{ marginLeft: 'auto', color: isToday ? C.teal : C.t1, fontSize: 10, fontFamily: mono }}>
+              {isToday ? 'AI 생성 · 오늘' : `AI 생성 · ${briefingDate}`}
+            </span>
+          )}
         </div>
-        <p style={{ color: C.t0, fontSize: 13, lineHeight: 1.65, marginBottom: briefingChips.length > 0 ? 12 : 0 }}>
-          {briefingText}
-        </p>
-        {briefingChips.length > 0 && (
-          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-            {briefingChips.map((chip) => (
-              <span key={chip} style={{
-                background: C.bg3, border: `1px solid ${C.b1}`,
-                borderRadius: 6, padding: '3px 9px', color: C.t1, fontSize: 11, fontFamily: mono,
-              }}>{chip}</span>
-            ))}
-          </div>
+
+        {hasAiBriefing ? (
+          <>
+            {aiBriefing!.greeting && (
+              <p style={{ color: C.t0, fontSize: 13.5, fontWeight: 500, marginBottom: 8 }}>
+                {aiBriefing!.greeting}
+              </p>
+            )}
+            {aiBriefing!.summary && (
+              <p style={{ color: C.t0, fontSize: 13, lineHeight: 1.65, marginBottom: 12 }}>
+                {aiBriefing!.summary}
+              </p>
+            )}
+            {aiBriefing!.highlights && aiBriefing!.highlights.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                {aiBriefing!.highlights.slice(0, 3).map((h, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{
+                      width: 4, height: 4, borderRadius: '50%', flexShrink: 0, marginTop: 7,
+                      background: HIGHLIGHT_COLORS[h.type] ?? C.blue,
+                    }} />
+                    <span style={{ color: C.t0, fontSize: 12.5, lineHeight: 1.5 }}>{h.message}</span>
+                    {h.priority === 'high' && (
+                      <span style={{
+                        flexShrink: 0, fontSize: 9.5, fontWeight: 600, color: C.rose,
+                        background: `${C.rose}18`, borderRadius: 4, padding: '1px 5px',
+                      }}>HIGH</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {aiBriefing!.suggestions && aiBriefing!.suggestions.length > 0 && (
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                {aiBriefing!.suggestions.slice(0, 3).map((s, i) => (
+                  <span key={i} style={{
+                    background: C.bg3, border: `1px solid ${C.b1}`,
+                    borderRadius: 6, padding: '3px 9px', color: C.t1, fontSize: 11, fontFamily: mono,
+                  }}>{s}</span>
+                ))}
+              </div>
+            )}
+            {aiBriefing!.motivationalNote && (
+              <p style={{ color: `${C.teal}CC`, fontSize: 12, marginTop: 10, fontStyle: 'italic' }}>
+                {aiBriefing!.motivationalNote}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <p style={{ color: C.t0, fontSize: 13, lineHeight: 1.65, marginBottom: briefingParts.length > 0 ? 12 : 0 }}>
+              {fallbackText}
+            </p>
+            {briefingParts.length > 0 && (
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                {todayEvents.slice(0, 2).map((e) => (
+                  <span key={e.id} style={{
+                    background: C.bg3, border: `1px solid ${C.b1}`,
+                    borderRadius: 6, padding: '3px 9px', color: C.t1, fontSize: 11, fontFamily: mono,
+                  }}>{e.time ? e.time + ' ' : ''}{e.title}</span>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
