@@ -42,11 +42,26 @@ Parameters:
       Leave empty on first deployment. After deploy, copy ApiUrl output value
       (e.g. abc123.execute-api.ap-northeast-2.amazonaws.com) and redeploy.
 
+  DomainName:
+    Type: String
+    Default: ""
+    Description: >
+      Custom domain (e.g. minseongkim.me). Leave empty to use the default
+      CloudFront domain. Requires AcmCertificateArn to be set.
+
+  AcmCertificateArn:
+    Type: String
+    Default: ""
+    Description: >
+      ARN of an ACM certificate in us-east-1 that covers DomainName (and
+      www.DomainName). Required when DomainName is set.
+
 # ---------------------------------------------------------------------------
 # Conditions
 # ---------------------------------------------------------------------------
 Conditions:
   HasApiDomainName: !Not [!Equals [!Ref ApiDomainName, ""]]
+  HasCustomDomain: !Not [!Equals [!Ref AcmCertificateArn, ""]]
 
 # ---------------------------------------------------------------------------
 # Resources
@@ -416,6 +431,16 @@ Resources:
               AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
               OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
             - !Ref AWS::NoValue
+        Aliases: !If
+          - HasCustomDomain
+          - - !Ref DomainName
+          - !Ref AWS::NoValue
+        ViewerCertificate: !If
+          - HasCustomDomain
+          - AcmCertificateArn: !Ref AcmCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 200
@@ -443,9 +468,18 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-ApiDomainName"
 
+  CloudFrontDomain:
+    Description: "Bare CloudFront domain — use as CNAME target in Namecheap DNS"
+    Value: !GetAtt CloudFrontDistribution.DomainName
+    Export:
+      Name: !Sub "${AWS::StackName}-CloudFrontDomain"
+
   CloudFrontUrl:
-    Description: "CloudFront distribution URL"
-    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+    Description: "Site URL (custom domain when configured, otherwise CloudFront default)"
+    Value: !If
+      - HasCustomDomain
+      - !Sub "https://${DomainName}"
+      - !Sub "https://${CloudFrontDistribution.DomainName}"
     Export:
       Name: !Sub "${AWS::StackName}-CloudFrontUrl"
 

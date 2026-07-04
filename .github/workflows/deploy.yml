@@ -85,10 +85,14 @@ jobs:
       - name: SAM Deploy
         working-directory: infrastructure
         run: |
+          DOMAIN_PARAM="${{ secrets.DOMAIN_NAME }}"
+          CERT_PARAM="${{ secrets.ACM_CERTIFICATE_ARN }}"
           sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
             --parameter-overrides \
               "Environment=dev" \
-              "AllowedOrigin=${{ steps.get_cf_url.outputs.cf_url }}"
+              "AllowedOrigin=${{ steps.get_cf_url.outputs.cf_url }}" \
+              "DomainName=${DOMAIN_PARAM}" \
+              "AcmCertificateArn=${CERT_PARAM}"
 
       - name: Update CORS to CloudFront URL (post-deploy)
         run: |
@@ -98,13 +102,17 @@ jobs:
             --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
             --output text)
           PREV_URL="${{ steps.get_cf_url.outputs.cf_url }}"
+          DOMAIN_PARAM="${{ secrets.DOMAIN_NAME }}"
+          CERT_PARAM="${{ secrets.ACM_CERTIFICATE_ARN }}"
           if [ "$CF_URL" != "$PREV_URL" ] && [ -n "$CF_URL" ] && [ "$CF_URL" != "None" ]; then
             echo "Updating AllowedOrigin from '$PREV_URL' to '$CF_URL'"
             cd infrastructure
             sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
               --parameter-overrides \
                 "Environment=dev" \
-                "AllowedOrigin=$CF_URL"
+                "AllowedOrigin=$CF_URL" \
+                "DomainName=${DOMAIN_PARAM}" \
+                "AcmCertificateArn=${CERT_PARAM}"
           else
             echo "AllowedOrigin already correct: $CF_URL"
           fi
