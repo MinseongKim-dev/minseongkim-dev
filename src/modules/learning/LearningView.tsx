@@ -101,9 +101,9 @@ export function LearningView() {
 
   return (
     <div style={{ fontFamily: font }}>
-      <div style={{ marginBottom: 22 }}>
+      <div style={{ marginBottom: 14 }}>
         <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>학습</h1>
-        <p style={{ color: C.t1, fontSize: 12.5, marginTop: 4 }}>
+        <p style={{ color: C.t1, fontSize: 12.5, marginTop: 3 }}>
           {loading ? '불러오는 중...' : `목표 ${goals.length}개 · 독서 중 ${reading}권 · 완독 ${completed}권`}
         </p>
       </div>
