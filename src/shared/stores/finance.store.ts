@@ -20,9 +20,19 @@ export interface Budget {
   period: 'monthly';
 }
 
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate?: string;
+  notes?: string;
+}
+
 interface FinanceStore {
   items: Transaction[];
   budgets: Budget[];
+  savingsGoals: SavingsGoal[];
   loading: boolean;
   fetch: () => Promise<void>;
   add: (data: Omit<Transaction, 'id'>) => Promise<void>;
@@ -30,11 +40,16 @@ interface FinanceStore {
   fetchBudgets: () => Promise<void>;
   setBudget: (data: Omit<Budget, 'id'>) => Promise<void>;
   removeBudget: (id: string) => Promise<void>;
+  fetchSavingsGoals: () => Promise<void>;
+  addSavingsGoal: (data: Omit<SavingsGoal, 'id'>) => Promise<void>;
+  updateSavingsGoal: (id: string, data: Partial<SavingsGoal>) => Promise<void>;
+  removeSavingsGoal: (id: string) => Promise<void>;
 }
 
 export const useFinanceStore = create<FinanceStore>((set) => ({
   items: [],
   budgets: [],
+  savingsGoals: [],
   loading: false,
 
   fetch: async () => {
@@ -91,6 +106,39 @@ export const useFinanceStore = create<FinanceStore>((set) => ({
     set((s) => ({ budgets: s.budgets.filter((b) => b.id !== id) }));
     await api.delete<unknown>(`/budgets/${id}`).catch((err) => {
       useToastStore.getState().add(err instanceof Error ? err.message : '예산 삭제에 실패했습니다');
+    });
+  },
+
+  fetchSavingsGoals: async () => {
+    try {
+      const savingsGoals = await api.get<SavingsGoal[]>('/savings-goals');
+      set({ savingsGoals: savingsGoals ?? [] });
+    } catch {
+      // non-critical
+    }
+  },
+
+  addSavingsGoal: async (data) => {
+    try {
+      const item = await api.post<SavingsGoal>('/savings-goals', data);
+      set((s) => ({ savingsGoals: [item, ...s.savingsGoals] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '저축 목표 추가에 실패했습니다');
+      throw err;
+    }
+  },
+
+  updateSavingsGoal: async (id, data) => {
+    set((s) => ({ savingsGoals: s.savingsGoals.map((g) => (g.id === id ? { ...g, ...data } : g)) }));
+    await api.put<SavingsGoal>(`/savings-goals/${id}`, data).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '업데이트에 실패했습니다');
+    });
+  },
+
+  removeSavingsGoal: async (id) => {
+    set((s) => ({ savingsGoals: s.savingsGoals.filter((g) => g.id !== id) }));
+    await api.delete<unknown>(`/savings-goals/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
     });
   },
 }));

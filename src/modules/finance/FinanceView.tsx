@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, TrendingUp, TrendingDown, Target } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, Target, PiggyBank } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useFinanceStore, type TxType } from '../../shared/stores/finance.store';
 
@@ -7,7 +7,7 @@ const C = {
   bg1: '#090D1F', bg2: '#0D1228', bg3: '#131B32',
   b0: 'rgba(255,255,255,0.04)', b1: 'rgba(255,255,255,0.08)',
   t0: '#DDE5F5', t1: '#556070', t2: '#253040',
-  blue: '#3B8EF0', teal: '#00CCA0', amber: '#EFA020', rose: '#F05472',
+  blue: '#3B8EF0', violet: '#7C5CF0', teal: '#00CCA0', amber: '#EFA020', rose: '#F05472', sky: '#58AEFF',
 };
 const font = '"Space Grotesk", system-ui, sans-serif';
 const mono = '"JetBrains Mono", "Fira Code", monospace';
@@ -47,9 +47,19 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   );
 };
 
+type TabId = 'transactions' | 'budget' | 'savings';
+
 export function FinanceView() {
-  const { items, budgets, loading, fetch, add, remove, fetchBudgets, setBudget, removeBudget } = useFinanceStore();
-  const [tab, setTab] = useState<'transactions' | 'budget'>('transactions');
+  const {
+    items, budgets, savingsGoals, loading,
+    fetch, add, remove,
+    fetchBudgets, setBudget, removeBudget,
+    fetchSavingsGoals, addSavingsGoal, updateSavingsGoal, removeSavingsGoal,
+  } = useFinanceStore();
+
+  const [tab, setTab] = useState<TabId>('transactions');
+
+  // Transaction form
   const [showForm, setShowForm] = useState(false);
   const [txTitle, setTxTitle] = useState('');
   const [amount, setAmount] = useState('');
@@ -57,15 +67,25 @@ export function FinanceView() {
   const [category, setCategory] = useState('식비');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Budget form state
+  // Budget form
   const [showBudgetForm, setShowBudgetForm] = useState(false);
   const [budgetCategory, setBudgetCategory] = useState('식비');
   const [budgetAmount, setBudgetAmount] = useState('');
 
+  // Savings form
+  const [showSavingsForm, setShowSavingsForm] = useState(false);
+  const [savingsName, setSavingsName] = useState('');
+  const [savingsTarget, setSavingsTarget] = useState('');
+  const [savingsCurrent, setSavingsCurrent] = useState('');
+  const [savingsDate, setSavingsDate] = useState('');
+  const [depositGoalId, setDepositGoalId] = useState<string | null>(null);
+  const [depositAmount, setDepositAmount] = useState('');
+
   useEffect(() => {
     fetch();
     fetchBudgets();
-  }, [fetch, fetchBudgets]);
+    fetchSavingsGoals();
+  }, [fetch, fetchBudgets, fetchSavingsGoals]);
 
   const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
     .toISOString().split('T')[0];
@@ -88,6 +108,16 @@ export function FinanceView() {
 
   const sorted = [...items].sort((a, b) => b.date.localeCompare(a.date));
 
+  const expenseByCategory = EXPENSE_CATEGORIES.reduce<Record<string, number>>((acc, cat) => {
+    acc[cat] = items
+      .filter((t) => t.type === 'expense' && t.category === cat && t.date >= firstOfMonth)
+      .reduce((s, t) => s + t.amount, 0);
+    return acc;
+  }, {});
+
+  const totalSavingsTarget = savingsGoals.reduce((s, g) => s + g.targetAmount, 0);
+  const totalSavingsCurrent = savingsGoals.reduce((s, g) => s + g.currentAmount, 0);
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const n = parseFloat(amount.replace(/,/g, ''));
@@ -104,13 +134,31 @@ export function FinanceView() {
     setBudgetAmount(''); setShowBudgetForm(false);
   };
 
-  // Per-category expense this month
-  const expenseByCategory = EXPENSE_CATEGORIES.reduce<Record<string, number>>((acc, cat) => {
-    acc[cat] = items
-      .filter((t) => t.type === 'expense' && t.category === cat && t.date >= firstOfMonth)
-      .reduce((s, t) => s + t.amount, 0);
-    return acc;
-  }, {});
+  const handleAddSavings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const target = parseFloat(savingsTarget.replace(/,/g, ''));
+    const current = parseFloat(savingsCurrent.replace(/,/g, '') || '0');
+    if (!savingsName.trim() || isNaN(target) || target <= 0) return;
+    await addSavingsGoal({
+      name: savingsName.trim(),
+      targetAmount: target,
+      currentAmount: isNaN(current) ? 0 : current,
+      targetDate: savingsDate || undefined,
+    });
+    setSavingsName(''); setSavingsTarget(''); setSavingsCurrent(''); setSavingsDate('');
+    setShowSavingsForm(false);
+  };
+
+  const handleDeposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!depositGoalId) return;
+    const n = parseFloat(depositAmount.replace(/,/g, ''));
+    if (isNaN(n) || n <= 0) return;
+    const goal = savingsGoals.find((g) => g.id === depositGoalId);
+    if (!goal) return;
+    await updateSavingsGoal(depositGoalId, { currentAmount: goal.currentAmount + n });
+    setDepositAmount(''); setDepositGoalId(null);
+  };
 
   const statCard = (label: string, value: number, color: string, Icon: React.ComponentType<{ size?: number; color?: string }>) => (
     <div style={{ flex: 1, background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '16px 20px' }}>
@@ -122,15 +170,15 @@ export function FinanceView() {
     </div>
   );
 
-  const tabBtn = (id: 'transactions' | 'budget', label: string) => (
+  const tabBtn = (id: TabId, label: string) => (
     <button
       onClick={() => setTab(id)}
       style={{
-        padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-        fontFamily: font, cursor: 'pointer',
-        background: tab === id ? `${C.amber}18` : 'transparent',
-        border: `1px solid ${tab === id ? C.amber : C.b1}`,
-        color: tab === id ? C.amber : C.t1,
+        padding: '6px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+        fontFamily: font, cursor: 'pointer', transition: 'all 0.14s',
+        background: tab === id ? C.bg3 : 'transparent',
+        border: `1px solid ${tab === id ? C.b1 : 'transparent'}`,
+        color: tab === id ? C.t0 : C.t1,
       }}
     >{label}</button>
   );
@@ -150,7 +198,7 @@ export function FinanceView() {
         {statCard('총 지출', totalExpense, C.rose, TrendingDown)}
         <div style={{ flex: 1, background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 14 }}>💰</span>
+            <span style={{ fontSize: 13 }}>💰</span>
             <span style={{ color: C.t1, fontSize: 12 }}>잔액</span>
           </div>
           <p style={{ color: balance >= 0 ? C.teal : C.rose, fontSize: 18, fontWeight: 700, fontFamily: mono }}>
@@ -159,10 +207,14 @@ export function FinanceView() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+      {/* Tab bar */}
+      <div style={{
+        display: 'flex', gap: 4, marginBottom: 20,
+        background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 4, width: 'fit-content',
+      }}>
         {tabBtn('transactions', '거래 내역')}
         {tabBtn('budget', '예산 관리')}
+        {tabBtn('savings', '저축 목표')}
       </div>
 
       {/* Transactions tab */}
@@ -220,15 +272,8 @@ export function FinanceView() {
             <form onSubmit={handleAdd} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <input autoFocus value={txTitle} onChange={(e) => setTxTitle(e.target.value)} placeholder="거래 내용" style={inputStyle} />
               <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="금액" inputMode="numeric"
-                  style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, outline: 'none' }}
-                />
-                <select
-                  value={type}
-                  onChange={(e) => { setType(e.target.value as TxType); setCategory(e.target.value === 'expense' ? '식비' : '급여'); }}
-                  style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, cursor: 'pointer' }}
-                >
+                <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="금액" inputMode="numeric" style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, outline: 'none' }} />
+                <select value={type} onChange={(e) => { setType(e.target.value as TxType); setCategory(e.target.value === 'expense' ? '식비' : '급여'); }} style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>
                   <option value="expense">지출</option>
                   <option value="income">수입</option>
                 </select>
@@ -255,13 +300,11 @@ export function FinanceView() {
       {/* Budget tab */}
       {tab === 'budget' && (
         <>
-          {/* This month summary */}
           <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
             <p style={{ color: C.t1, fontSize: 11.5, marginBottom: 4 }}>이번 달 총 지출</p>
             <p style={{ color: C.rose, fontSize: 22, fontWeight: 700, fontFamily: mono }}>{fmt(monthExpense)}</p>
           </div>
 
-          {/* Budget list by category */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
             {EXPENSE_CATEGORIES.map((cat) => {
               const budget = budgets.find((b) => b.category === cat);
@@ -286,37 +329,24 @@ export function FinanceView() {
                   </div>
                   {budget && (
                     <div style={{ height: 4, background: C.bg3, borderRadius: 2 }}>
-                      <div style={{
-                        height: '100%', width: `${pct}%`,
-                        background: over ? C.rose : pct > 80 ? C.amber : C.teal,
-                        borderRadius: 2, transition: 'width 0.3s',
-                      }} />
+                      <div style={{ height: '100%', width: `${pct}%`, background: over ? C.rose : pct > 80 ? C.amber : C.teal, borderRadius: 2, transition: 'width 0.3s' }} />
                     </div>
                   )}
-                  {over && (
-                    <p style={{ color: C.rose, fontSize: 11, marginTop: 6 }}>
-                      예산 {fmt(spent - budget!.amount)} 초과
-                    </p>
-                  )}
+                  {over && <p style={{ color: C.rose, fontSize: 11, marginTop: 6 }}>예산 {fmt(spent - budget!.amount)} 초과</p>}
                 </div>
               );
             })}
             {budgets.length === 0 && (
-              <p style={{ color: C.t2, fontSize: 13, padding: '12px 0' }}>설정된 예산이 없습니다. 카테고리별 예산을 추가해보세요.</p>
+              <p style={{ color: C.t2, fontSize: 13, padding: '12px 0' }}>카테고리별 예산을 추가해보세요.</p>
             )}
           </div>
 
-          {/* Budget form */}
           {showBudgetForm ? (
             <form onSubmit={handleSetBudget} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <select value={budgetCategory} onChange={(e) => setBudgetCategory(e.target.value)} style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '9px 12px', color: C.t0, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>
                 {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-              <input
-                autoFocus value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)}
-                placeholder="월 예산 금액 (원)" inputMode="numeric"
-                style={inputStyle}
-              />
+              <input autoFocus value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)} placeholder="월 예산 금액 (원)" inputMode="numeric" style={inputStyle} />
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="submit" style={{ flex: 1, padding: '9px', background: C.amber, color: '#06091A', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: font, cursor: 'pointer' }}>예산 설정</button>
                 <button type="button" onClick={() => setShowBudgetForm(false)} style={{ padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
@@ -325,6 +355,133 @@ export function FinanceView() {
           ) : (
             <button onClick={() => setShowBudgetForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}>
               <Plus size={14} />예산 추가
+            </button>
+          )}
+        </>
+      )}
+
+      {/* Savings tab */}
+      {tab === 'savings' && (
+        <>
+          {/* Overall progress */}
+          {savingsGoals.length > 0 && (
+            <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <PiggyBank size={14} color={C.sky} />
+                <span style={{ color: C.t1, fontSize: 12 }}>전체 저축 진행률</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+                <span style={{ color: C.sky, fontSize: 20, fontWeight: 700, fontFamily: mono }}>{fmt(totalSavingsCurrent)}</span>
+                <span style={{ color: C.t1, fontSize: 12, fontFamily: mono }}>/ {fmt(totalSavingsTarget)}</span>
+                <span style={{ color: C.sky, fontSize: 12, fontWeight: 600, marginLeft: 'auto', fontFamily: mono }}>
+                  {totalSavingsTarget > 0 ? Math.round((totalSavingsCurrent / totalSavingsTarget) * 100) : 0}%
+                </span>
+              </div>
+              <div style={{ height: 6, background: C.bg3, borderRadius: 3 }}>
+                <div style={{
+                  height: '100%',
+                  width: `${totalSavingsTarget > 0 ? Math.min(100, (totalSavingsCurrent / totalSavingsTarget) * 100) : 0}%`,
+                  background: `linear-gradient(90deg, ${C.sky}, ${C.violet})`,
+                  borderRadius: 3, transition: 'width 0.4s',
+                }} />
+              </div>
+            </div>
+          )}
+
+          {/* Goal cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+            {savingsGoals.map((goal) => {
+              const pct = goal.targetAmount > 0 ? Math.min(100, (goal.currentAmount / goal.targetAmount) * 100) : 0;
+              const done = goal.currentAmount >= goal.targetAmount;
+              return (
+                <div key={goal.id} style={{
+                  background: C.bg2, border: `1px solid ${done ? C.teal + '40' : C.b1}`, borderRadius: 12, padding: '16px 18px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                      background: done ? `${C.teal}20` : `${C.sky}18`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <PiggyBank size={14} color={done ? C.teal : C.sky} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ color: C.t0, fontSize: 14, fontWeight: 600 }}>{goal.name}</p>
+                      {goal.targetDate && (
+                        <p style={{ color: C.t2, fontSize: 11, marginTop: 2, fontFamily: mono }}>목표: {goal.targetDate}</p>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ color: done ? C.teal : C.sky, fontSize: 14, fontWeight: 700, fontFamily: mono }}>{fmt(goal.currentAmount)}</p>
+                      <p style={{ color: C.t1, fontSize: 11, fontFamily: mono }}>/ {fmt(goal.targetAmount)}</p>
+                    </div>
+                    <button onClick={() => removeSavingsGoal(goal.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex', flexShrink: 0, marginTop: 2 }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+
+                  <div style={{ height: 6, background: C.bg3, borderRadius: 3, marginBottom: 10 }}>
+                    <div style={{
+                      height: '100%', width: `${pct}%`,
+                      background: done ? C.teal : `linear-gradient(90deg, ${C.sky}, ${C.violet})`,
+                      borderRadius: 3, transition: 'width 0.4s',
+                    }} />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ color: C.t2, fontSize: 11, fontFamily: mono }}>{Math.round(pct)}%</span>
+                    {done && <span style={{ color: C.teal, fontSize: 11, fontWeight: 600 }}>✓ 달성!</span>}
+                    {!done && (
+                      <button
+                        onClick={() => setDepositGoalId(depositGoalId === goal.id ? null : goal.id)}
+                        style={{
+                          marginLeft: 'auto', fontSize: 11, padding: '4px 12px',
+                          background: `${C.sky}18`, border: `1px solid ${C.sky}40`,
+                          color: C.sky, borderRadius: 6, cursor: 'pointer', fontFamily: font, fontWeight: 600,
+                        }}
+                      >+ 입금</button>
+                    )}
+                  </div>
+
+                  {depositGoalId === goal.id && (
+                    <form onSubmit={handleDeposit} style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                      <input
+                        autoFocus
+                        value={depositAmount}
+                        onChange={(e) => setDepositAmount(e.target.value)}
+                        placeholder="입금액 (원)"
+                        inputMode="numeric"
+                        style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '7px 12px', color: C.t0, fontSize: 13, fontFamily: mono, outline: 'none' }}
+                      />
+                      <button type="submit" style={{ padding: '7px 14px', background: C.sky, color: '#06091A', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: font, cursor: 'pointer' }}>추가</button>
+                      <button type="button" onClick={() => setDepositGoalId(null)} style={{ padding: '7px 12px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
+                    </form>
+                  )}
+                </div>
+              );
+            })}
+            {savingsGoals.length === 0 && (
+              <p style={{ color: C.t2, fontSize: 13, padding: '12px 0' }}>저축 목표를 추가해보세요.</p>
+            )}
+          </div>
+
+          {/* Add savings goal form */}
+          {showSavingsForm ? (
+            <form onSubmit={handleAddSavings} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <input autoFocus value={savingsName} onChange={(e) => setSavingsName(e.target.value)} placeholder="목표 이름 (예: 비상금, 여행)" style={inputStyle} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={savingsTarget} onChange={(e) => setSavingsTarget(e.target.value)} placeholder="목표 금액 (원)" inputMode="numeric" style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, outline: 'none' }} />
+                <input value={savingsCurrent} onChange={(e) => setSavingsCurrent(e.target.value)} placeholder="현재 금액 (원)" inputMode="numeric" style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, outline: 'none' }} />
+              </div>
+              <input type="date" value={savingsDate} onChange={(e) => setSavingsDate(e.target.value)} style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, colorScheme: 'dark' }} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" style={{ flex: 1, padding: '9px', background: C.sky, color: '#06091A', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: font, cursor: 'pointer' }}>목표 추가</button>
+                <button type="button" onClick={() => setShowSavingsForm(false)} style={{ padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
+              </div>
+            </form>
+          ) : (
+            <button onClick={() => setShowSavingsForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}>
+              <Plus size={14} />저축 목표 추가
             </button>
           )}
         </>
