@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, Plus, Trash2, Tag, Folder, FolderOpen, ChevronRight } from 'lucide-react';
 import { useTasksStore, type Priority, type Task, type Project } from '../../shared/stores/tasks.store';
+import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
 const C = {
   bg0: '#06091A', bg1: '#090D1F', bg2: '#0D1228', bg3: '#131B32',
@@ -148,7 +149,7 @@ interface AddTaskFormProps {
   projects: Project[];
   parentLabel?: string;
   onSubmit: (data: { title: string; priority: Priority; due?: string; tags?: string[]; projectId?: string }) => void;
-  onCancel: () => void;
+  onCancel?: () => void;
 }
 
 function AddTaskForm({ projects, parentLabel, onSubmit, onCancel }: AddTaskFormProps) {
@@ -163,12 +164,13 @@ function AddTaskForm({ projects, parentLabel, onSubmit, onCancel }: AddTaskFormP
     if (!title.trim()) return;
     const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
     onSubmit({ title: title.trim(), priority, due: due || undefined, tags: tags.length ? tags : undefined, projectId: projectId || undefined });
+    setTitle(''); setDue(''); setTagsInput(''); setPriority('medium'); setProjectId('');
   };
 
   return (
     <form
       onSubmit={handleSubmit}
-      style={{ marginTop: 12, background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
     >
       {parentLabel && (
         <p style={{ color: C.violet, fontSize: 11.5, marginBottom: -4 }}>하위 작업: {parentLabel}</p>
@@ -199,7 +201,9 @@ function AddTaskForm({ projects, parentLabel, onSubmit, onCancel }: AddTaskFormP
       )}
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="submit" style={{ flex: 1, padding: '9px', background: C.blue, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer' }}>추가</button>
-        <button type="button" onClick={onCancel} style={{ padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
+        {onCancel && (
+          <button type="button" onClick={onCancel} style={{ padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
+        )}
       </div>
     </form>
   );
@@ -207,6 +211,7 @@ function AddTaskForm({ projects, parentLabel, onSubmit, onCancel }: AddTaskFormP
 
 export function TasksView() {
   const { items, projects, loading, fetch, add, toggle, remove, addProject, removeProject } = useTasksStore();
+  const { isMobile } = useWindowSize();
   const [tab, setTab] = useState<TabId>('all');
   const [showForm, setShowForm] = useState(false);
   const [addingParentId, setAddingParentId] = useState<string | null>(null);
@@ -269,7 +274,10 @@ export function TasksView() {
   );
 
   return (
-    <div style={{ fontFamily: font }}>
+    <div style={{ fontFamily: font, display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+
+      {/* ── Left column: list ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ marginBottom: 12 }}>
         <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>할 일</h1>
         <p style={{ color: C.t1, fontSize: 12.5, marginTop: 3 }}>
@@ -337,20 +345,30 @@ export function TasksView() {
             )}
           </div>
 
-          {showForm ? (
+          {/* Subtask inline form */}
+          {showForm && addingParentId && (
             <AddTaskForm
               projects={projects}
-              parentLabel={addingParentId ? (items.find((t) => t.id === addingParentId)?.title ?? '') : undefined}
+              parentLabel={items.find((t) => t.id === addingParentId)?.title ?? ''}
               onSubmit={handleAdd}
               onCancel={() => { setShowForm(false); setAddingParentId(null); }}
             />
-          ) : (
+          )}
+          {/* Mobile-only: add new task button */}
+          {isMobile && !showForm && (
             <button
               onClick={() => { setAddingParentId(null); setShowForm(true); }}
               style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}
             >
               <Plus size={14} />새 할 일 추가
             </button>
+          )}
+          {isMobile && showForm && !addingParentId && (
+            <AddTaskForm
+              projects={projects}
+              onSubmit={handleAdd}
+              onCancel={() => setShowForm(false)}
+            />
           )}
         </>
       )}
@@ -415,20 +433,28 @@ export function TasksView() {
             </button>
           )}
 
-          {showForm ? (
+          {showForm && addingParentId && (
             <AddTaskForm
               projects={projects}
-              parentLabel={addingParentId ? (items.find((t) => t.id === addingParentId)?.title ?? '') : undefined}
+              parentLabel={items.find((t) => t.id === addingParentId)?.title ?? ''}
               onSubmit={handleAdd}
               onCancel={() => { setShowForm(false); setAddingParentId(null); }}
             />
-          ) : (
+          )}
+          {isMobile && !showForm && (
             <button
               onClick={() => { setAddingParentId(null); setShowForm(true); }}
               style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}
             >
               <Plus size={14} />새 할 일 추가
             </button>
+          )}
+          {isMobile && showForm && !addingParentId && (
+            <AddTaskForm
+              projects={projects}
+              onSubmit={handleAdd}
+              onCancel={() => setShowForm(false)}
+            />
           )}
         </>
       )}
@@ -453,6 +479,76 @@ export function TasksView() {
           ))}
           {doneTasks.length === 0 && (
             <p style={{ color: C.t2, fontSize: 13, padding: '30px 0' }}>완료된 할 일이 없습니다.</p>
+          )}
+        </div>
+      )}
+      </div>{/* end left column */}
+
+      {/* ── Right panel: desktop add form + stats ── */}
+      {!isMobile && (
+        <div style={{ width: 272, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          {/* Quick stats */}
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>현황</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {[
+                { label: '전체', value: items.length, color: C.blue },
+                { label: '완료', value: doneTasks.length, color: C.teal },
+                { label: '진행 중', value: activeTasks.length, color: C.violet },
+                { label: '긴급', value: urgent, color: C.rose },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: C.bg1, borderRadius: 9, padding: '10px 12px' }}>
+                  <div style={{ color, fontSize: 18, fontWeight: 700, fontFamily: mono }}>{value}</div>
+                  <div style={{ color: C.t1, fontSize: 11, marginTop: 2 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+            {activeTasks.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <span style={{ color: C.t1, fontSize: 11 }}>완료율</span>
+                  <span style={{ color: C.t0, fontSize: 11, fontFamily: mono }}>{Math.round(doneTasks.length / items.length * 100)}%</span>
+                </div>
+                <div style={{ height: 4, background: C.b1, borderRadius: 2 }}>
+                  <div style={{
+                    height: '100%', borderRadius: 2,
+                    width: `${Math.round(doneTasks.length / items.length * 100)}%`,
+                    background: `linear-gradient(90deg, ${C.teal}, ${C.blue})`,
+                  }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Add task form (desktop always-visible) */}
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>새 할 일</p>
+            <AddTaskForm
+              projects={projects}
+              onSubmit={handleAdd}
+              onCancel={() => {}}
+            />
+          </div>
+
+          {/* Projects quick list */}
+          {projects.length > 0 && (
+            <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+              <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 10 }}>프로젝트</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {projects.map((p, i) => {
+                  const col = PROJECT_PALETTE[i % PROJECT_PALETTE.length];
+                  const count = activeTasks.filter((t) => t.projectId === p.id).length;
+                  return (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: col, flexShrink: 0 }} />
+                      <span style={{ flex: 1, color: C.t0, fontSize: 12.5 }}>{p.name}</span>
+                      <span style={{ color: C.t2, fontSize: 11, fontFamily: mono }}>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
       )}
