@@ -416,7 +416,7 @@ export function HealthView() {
   ];
 
   return (
-    <div style={{ padding: '26px 28px', fontFamily: font }}>
+    <div style={{ fontFamily: font }}>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>건강</h1>
       </div>

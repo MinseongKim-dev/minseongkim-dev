@@ -133,7 +133,7 @@ export function RelationshipsView() {
   );
 
   return (
-    <div style={{ padding: '26px 28px', fontFamily: font }}>
+    <div style={{ fontFamily: font }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>관계</h1>
         <p style={{ color: C.t1, fontSize: 12.5, marginTop: 4 }}>

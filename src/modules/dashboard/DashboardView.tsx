@@ -280,7 +280,7 @@ export function DashboardView() {
   const isToday = briefingDate === todayStr;
 
   return (
-    <div style={{ padding: '26px 28px', fontFamily: font }}>
+    <div style={{ fontFamily: font }}>
       {/* Greeting */}
       <div style={{ marginBottom: 22 }}>
         <div style={{ color: C.t1, fontSize: 11, fontFamily: mono, marginBottom: 5 }}>{todayFmt}</div>

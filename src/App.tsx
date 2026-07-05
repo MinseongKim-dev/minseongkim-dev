@@ -30,6 +30,7 @@ function NodeApp() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Header onMenuClick={() => setMobileMenuOpen(true)} />
         <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ padding: isMobile ? '12px 14px' : '16px 20px' }}>
           <Suspense fallback={null}>
             {view === 'dashboard' && <DashboardView />}
             {view === 'schedule'  && <ScheduleView />}
@@ -40,6 +41,7 @@ function NodeApp() {
             {view === 'career'    && <CareerView />}
             {view === 'relations' && <RelationshipsView />}
           </Suspense>
+          </div>
         </div>
       </div>
       {isMobile && chatOpen ? (

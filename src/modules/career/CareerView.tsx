@@ -797,7 +797,7 @@ export function CareerView() {
   ];
 
   return (
-    <div style={{ padding: '26px 28px', fontFamily: font }}>
+    <div style={{ fontFamily: font }}>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>커리어</h1>
       </div>
