@@ -280,17 +280,17 @@ export function DashboardView() {
   const isToday = briefingDate === todayStr;
 
   return (
-    <div style={{ padding: '26px 28px', fontFamily: font }}>
+    <div style={{ fontFamily: font }}>
       {/* Greeting */}
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ color: C.t1, fontSize: 11, fontFamily: mono, marginBottom: 5 }}>{todayFmt}</div>
-        <h1 style={{ color: C.t0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.4px' }}>안녕하세요 👋</h1>
+      <div style={{ marginBottom: 14, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+        <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>안녕하세요 👋</h1>
+        <span style={{ color: C.t1, fontSize: 11, fontFamily: mono }}>{todayFmt}</span>
       </div>
 
       {/* AI Briefing Card */}
       <div style={{
         background: C.bg2, border: `1px solid ${C.b1}`, borderLeft: `3px solid ${C.blue}`,
-        borderRadius: 12, padding: '16px 18px', marginBottom: 16,
+        borderRadius: 12, padding: '13px 16px', marginBottom: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
           {hasAiBriefing && isToday
@@ -376,7 +376,7 @@ export function DashboardView() {
       {alertItem && (
         <div style={{
           background: `${C.amber}0E`, border: `1px solid ${C.amber}35`,
-          borderRadius: 10, padding: '9px 14px', marginBottom: 20,
+          borderRadius: 10, padding: '9px 14px', marginBottom: 12,
           display: 'flex', alignItems: 'center', gap: 9,
         }}>
           <AlertTriangle size={13} color={C.amber} />
@@ -391,7 +391,7 @@ export function DashboardView() {
       )}
 
       {/* Domain grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 11 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 10 }}>
         {DOMAIN_CARDS.map((card) => (
           <DomainCard key={card.id} card={card} onClick={() => setView(card.id)} />
         ))}

@@ -269,16 +269,16 @@ export function TasksView() {
   );
 
   return (
-    <div style={{ padding: '26px 28px', fontFamily: font }}>
-      <div style={{ marginBottom: 18 }}>
+    <div style={{ fontFamily: font }}>
+      <div style={{ marginBottom: 12 }}>
         <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>할 일</h1>
-        <p style={{ color: C.t1, fontSize: 12.5, marginTop: 4 }}>
+        <p style={{ color: C.t1, fontSize: 12.5, marginTop: 3 }}>
           {loading ? '불러오는 중...' : `${items.length}개 중 ${doneTasks.length}개 완료${urgent ? ` · 긴급 ${urgent}개` : ''}`}
         </p>
       </div>
 
       <div style={{
-        display: 'flex', gap: 4, marginBottom: 20,
+        display: 'flex', gap: 4, marginBottom: 14,
         background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 4, width: 'fit-content',
       }}>
         {tabBtn('all', '전체')}

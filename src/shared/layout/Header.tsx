@@ -25,7 +25,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       height: 52, padding: '0 24px', display: 'flex', alignItems: 'center',
       borderBottom: `1px solid ${C.b0}`, background: C.bg0, flexShrink: 0,
     }}>
-      {isMobile && (
+      {!isMobile && onMenuClick && (
         <button
           onClick={onMenuClick}
           style={{ color: C.t1, cursor: 'pointer', display: 'flex', marginRight: 14 }}

@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react';
 import { AuthGuard } from './components/Auth/AuthGuard';
 import { Sidebar } from './shared/layout/Sidebar';
 import { Header } from './shared/layout/Header';
+import { BottomNav } from './shared/layout/BottomNav';
 import { ChatPanel } from './shared/ui/ChatPanel';
 import { ToastContainer } from './shared/ui/ToastContainer';
 import { useAppStore } from './shared/stores/app.store';
@@ -30,6 +31,7 @@ function NodeApp() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Header onMenuClick={() => setMobileMenuOpen(true)} />
         <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ padding: isMobile ? '12px 14px' : '16px 20px', paddingBottom: isMobile ? 72 : undefined }}>
           <Suspense fallback={null}>
             {view === 'dashboard' && <DashboardView />}
             {view === 'schedule'  && <ScheduleView />}
@@ -40,8 +42,10 @@ function NodeApp() {
             {view === 'career'    && <CareerView />}
             {view === 'relations' && <RelationshipsView />}
           </Suspense>
+          </div>
         </div>
       </div>
+      <BottomNav />
       {isMobile && chatOpen ? (
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', justifyContent: 'flex-end' }}>
           <ChatPanel />

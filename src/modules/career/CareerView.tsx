@@ -797,12 +797,12 @@ export function CareerView() {
   ];
 
   return (
-    <div style={{ padding: '26px 28px', fontFamily: font }}>
-      <div style={{ marginBottom: 20 }}>
+    <div style={{ fontFamily: font }}>
+      <div style={{ marginBottom: 12 }}>
         <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>커리어</h1>
       </div>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 4, width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 4, width: 'fit-content' }}>
         {tabs.map(({ id, label, icon: Icon, color }) => (
           <button
             key={id}

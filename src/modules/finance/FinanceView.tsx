@@ -184,10 +184,10 @@ export function FinanceView() {
   );
 
   return (
-    <div style={{ padding: '26px 28px', fontFamily: font }}>
-      <div style={{ marginBottom: 22 }}>
+    <div style={{ fontFamily: font }}>
+      <div style={{ marginBottom: 14 }}>
         <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>재정</h1>
-        <p style={{ color: C.t1, fontSize: 12.5, marginTop: 4 }}>
+        <p style={{ color: C.t1, fontSize: 12.5, marginTop: 3 }}>
           {loading ? '불러오는 중...' : `총 ${items.length}건의 거래내역`}
         </p>
       </div>
