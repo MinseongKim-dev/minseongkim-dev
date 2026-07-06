@@ -40,6 +40,22 @@ function fmtDuration(mins: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+function calcStreak(dates: string[]): number {
+  const dateSet = new Set(dates);
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const yestStr = new Date(today.getTime() - 86400000).toISOString().split('T')[0];
+  const start = dateSet.has(todayStr) ? todayStr : yestStr;
+  if (!dateSet.has(start)) return 0;
+  let streak = 0;
+  const d = new Date(start + 'T12:00:00');
+  while (dateSet.has(d.toISOString().split('T')[0])) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
 function QualityStars({ q, size = 12 }: { q: number; size?: number }) {
   return (
     <span style={{ display: 'inline-flex', gap: 1 }}>
@@ -70,7 +86,6 @@ function StatCard({
   );
 }
 
-// Dashboard tab is read-only and self-contained
 function DashboardTab() {
   const { items, sleepLogs } = useHealthStore();
   const today = new Date().toISOString().split('T')[0];
@@ -111,6 +126,9 @@ function DashboardTab() {
     ? Math.floor((new Date(today).getTime() - new Date(recentWorkout.date).getTime()) / 86400000)
     : null;
 
+  const workoutStreak = calcStreak([...new Set(items.map((w) => w.date))]);
+  const sleepStreak = calcStreak(sleepLogs.map((l) => l.date));
+
   const todaySleep = sleepLogs.find((l) => l.date === today);
 
   return (
@@ -131,6 +149,26 @@ function DashboardTab() {
           <div key={label} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
             <p style={{ color: C.t1, fontSize: 11, marginBottom: 6 }}>{label}</p>
             <p style={{ color, fontSize: 18, fontWeight: 700, fontFamily: mono }}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Streak tracking */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
+        {[
+          { label: '운동 연속', streak: workoutStreak, color: C.teal, emoji: '🔥' },
+          { label: '수면 기록 연속', streak: sleepStreak, color: C.violet, emoji: '🌙' },
+        ].map(({ label, streak, color, emoji }) => (
+          <div key={label} style={{ background: C.bg2, border: `1px solid ${streak > 0 ? color + '40' : C.b1}`, borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: streak > 0 ? `${color}18` : C.b0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+              {streak > 0 ? emoji : '—'}
+            </div>
+            <div>
+              <p style={{ color: C.t1, fontSize: 11, marginBottom: 3 }}>{label}</p>
+              <p style={{ color: streak > 0 ? color : C.t2, fontSize: 20, fontWeight: 700, fontFamily: mono }}>
+                {streak}<span style={{ fontSize: 12, fontWeight: 400, marginLeft: 3 }}>일</span>
+              </p>
+            </div>
           </div>
         ))}
       </div>

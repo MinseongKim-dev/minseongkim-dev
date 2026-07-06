@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Phone, Mail, Calendar, Tag, MessageSquare, Users } from 'lucide-react';
+import { Plus, Trash2, Phone, Mail, Calendar, Tag, MessageSquare, Users, Gift } from 'lucide-react';
 import { useRelationshipsStore, type MeetingType, type MeetingMood } from '../../shared/stores/relationships.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
@@ -55,7 +55,16 @@ const selectStyle = {
   width: '100%', boxSizing: 'border-box' as const,
 };
 
-type TabId = 'contacts' | 'meetings';
+function daysUntilBirthday(birthday: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const bday = new Date(birthday + 'T00:00:00');
+  const next = new Date(today.getFullYear(), bday.getMonth(), bday.getDate());
+  if (next < today) next.setFullYear(today.getFullYear() + 1);
+  return Math.ceil((next.getTime() - today.getTime()) / 86400000);
+}
+
+type TabId = 'contacts' | 'meetings' | 'anniversaries';
 
 export function RelationshipsView() {
   const { items, meetings, loading, fetch, add, remove, addMeeting, removeMeeting } = useRelationshipsStore();
@@ -238,6 +247,7 @@ export function RelationshipsView() {
         }}>
           {tabBtn('contacts', `연락처 (${items.length})`)}
           {tabBtn('meetings', `만남 기록 (${meetings.length})`)}
+          {tabBtn('anniversaries', '기념일')}
         </div>
 
         {/* Contacts tab */}
@@ -428,6 +438,80 @@ export function RelationshipsView() {
             )}
           </>
         )}
+
+        {/* Anniversaries tab */}
+        {tab === 'anniversaries' && (() => {
+          const withBirthday = items.filter((c) => c.birthday).map((c) => ({
+            ...c,
+            daysLeft: daysUntilBirthday(c.birthday!),
+          })).sort((a, b) => a.daysLeft - b.daysLeft);
+
+          const today = new Date();
+          const upcoming30 = withBirthday.filter((c) => c.daysLeft <= 30);
+          const rest = withBirthday.filter((c) => c.daysLeft > 30);
+
+          const BirthdayCard = ({ c }: { c: typeof withBirthday[0] }) => {
+            const isToday = c.daysLeft === 0;
+            const isSoon = c.daysLeft <= 7;
+            const accentColor = isToday ? C.rose : isSoon ? C.amber : C.violet;
+            const bday = new Date(c.birthday! + 'T00:00:00');
+            const age = today.getFullYear() - bday.getFullYear() - (c.daysLeft > 0 ? 0 : 0);
+            const relColor = REL_COLOR[c.relationship] ?? C.sky;
+            return (
+              <div style={{ background: C.bg2, border: `1px solid ${isToday ? C.rose + '50' : C.b1}`, borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: `${accentColor}18`, border: `1px solid ${accentColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Gift size={18} color={accentColor} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ color: C.t0, fontSize: 14, fontWeight: 600 }}>{c.name}</span>
+                    <span style={{ fontSize: 10, color: relColor, background: `${relColor}18`, borderRadius: 5, padding: '2px 7px' }}>{c.relationship}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                    <span style={{ color: C.t1, fontSize: 11, fontFamily: mono }}>{c.birthday}</span>
+                    <span style={{ color: C.t2, fontSize: 11 }}>· 만 {age}세</span>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  {isToday ? (
+                    <span style={{ color: C.rose, fontSize: 13, fontWeight: 700 }}>🎂 오늘!</span>
+                  ) : (
+                    <>
+                      <p style={{ color: accentColor, fontSize: 18, fontWeight: 700, fontFamily: mono }}>{c.daysLeft}</p>
+                      <p style={{ color: C.t2, fontSize: 10.5 }}>일 후</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          };
+
+          return (
+            <>
+              {withBirthday.length === 0 && (
+                <p style={{ color: C.t2, fontSize: 13, padding: '20px 0' }}>생일이 등록된 연락처가 없습니다. 연락처에서 생일을 추가해 주세요.</p>
+              )}
+
+              {upcoming30.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <p style={{ color: C.amber, fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 10 }}>30일 내 생일</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {upcoming30.map((c) => <BirthdayCard key={c.id} c={c} />)}
+                  </div>
+                </div>
+              )}
+
+              {rest.length > 0 && (
+                <div>
+                  <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 10 }}>이후 생일</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {rest.map((c) => <BirthdayCard key={c.id} c={c} />)}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* ── Right panel: desktop only ── */}
@@ -438,12 +522,15 @@ export function RelationshipsView() {
           <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
             <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>현황</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {[
-                { label: '연락처', value: items.length, color: C.violet },
-                { label: '만남 기록', value: meetings.length, color: C.blue },
-                { label: '연락 필요', value: needsContact.length, color: needsContact.length > 0 ? C.amber : C.t2 },
-                { label: '이번 달 만남', value: meetings.filter((m) => m.date >= new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]).length, color: C.teal },
-              ].map(({ label, value, color }) => (
+              {(() => {
+                const upcoming7 = items.filter((c) => c.birthday && daysUntilBirthday(c.birthday) <= 7).length;
+                return [
+                  { label: '연락처', value: items.length, color: C.violet },
+                  { label: '만남 기록', value: meetings.length, color: C.blue },
+                  { label: '연락 필요', value: needsContact.length, color: needsContact.length > 0 ? C.amber : C.t2 },
+                  { label: '7일 내 생일', value: upcoming7, color: upcoming7 > 0 ? C.rose : C.t2 },
+                ];
+              })().map(({ label, value, color }) => (
                 <div key={label} style={{ background: C.bg1, borderRadius: 8, padding: '10px 12px' }}>
                   <p style={{ color: C.t2, fontSize: 10.5, marginBottom: 4 }}>{label}</p>
                   <p style={{ color, fontSize: 18, fontWeight: 700, fontFamily: mono }}>{value}</p>

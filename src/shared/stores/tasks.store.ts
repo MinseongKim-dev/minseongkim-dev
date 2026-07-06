@@ -11,12 +11,15 @@ export interface Project {
   status: 'active' | 'completed' | 'archived';
 }
 
+export type TaskStatus = 'todo' | 'in_progress' | 'done';
+
 export interface Task {
   id: string;
   title: string;
   priority: Priority;
   due?: string;
   done: boolean;
+  status?: TaskStatus;
   tags?: string[];
   parentTaskId?: string;
   projectId?: string;
@@ -29,6 +32,7 @@ interface TasksStore {
   fetch: () => Promise<void>;
   add: (data: { title: string; priority: Priority; due?: string; tags?: string[]; parentTaskId?: string; projectId?: string }) => Promise<void>;
   toggle: (id: string, done: boolean) => Promise<void>;
+  setStatus: (id: string, status: TaskStatus) => Promise<void>;
   updateTask: (id: string, data: Partial<Omit<Task, 'id'>>) => Promise<void>;
   remove: (id: string) => Promise<void>;
   addProject: (data: Omit<Project, 'id'>) => Promise<void>;
@@ -66,9 +70,18 @@ export const useTasksStore = create<TasksStore>((set) => ({
   },
 
   toggle: async (id, done) => {
-    set((s) => ({ items: s.items.map((t) => (t.id === id ? { ...t, done } : t)) }));
-    await api.put<Task>(`/tasks/${id}`, { done }).catch((err) => {
-      set((s) => ({ items: s.items.map((t) => (t.id === id ? { ...t, done: !done } : t)) }));
+    const status: TaskStatus = done ? 'done' : 'todo';
+    set((s) => ({ items: s.items.map((t) => (t.id === id ? { ...t, done, status } : t)) }));
+    await api.put<Task>(`/tasks/${id}`, { done, status }).catch((err) => {
+      set((s) => ({ items: s.items.map((t) => (t.id === id ? { ...t, done: !done, status: done ? 'todo' : 'done' } : t)) }));
+      useToastStore.getState().add(err instanceof Error ? err.message : '업데이트에 실패했습니다');
+    });
+  },
+
+  setStatus: async (id, status) => {
+    const done = status === 'done';
+    set((s) => ({ items: s.items.map((t) => (t.id === id ? { ...t, status, done } : t)) }));
+    await api.put<Task>(`/tasks/${id}`, { status, done }).catch((err) => {
       useToastStore.getState().add(err instanceof Error ? err.message : '업데이트에 실패했습니다');
     });
   },
