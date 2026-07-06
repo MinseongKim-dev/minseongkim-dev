@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Flame, Clock, Activity, Moon, BarChart2, Star } from 'lucide-react';
 import { useHealthStore, type SleepLog } from '../../shared/stores/health.store';
+import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
 const C = {
   bg0: '#06091A', bg1: '#090D1F', bg2: '#0D1228', bg3: '#131B32',
@@ -69,221 +70,9 @@ function StatCard({
   );
 }
 
-// ─── Workout Tab ─────────────────────────────────────────────────────────────
-function WorkoutTab() {
-  const { items, loading, add, remove } = useHealthStore();
-  const [showForm, setShowForm] = useState(false);
-  const [type, setType] = useState('달리기');
-  const [duration, setDuration] = useState('');
-  const [calories, setCalories] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [notes, setNotes] = useState('');
-
-  const weekStart = getWeekStart();
-  const weekItems = items.filter((w) => w.date >= weekStart);
-  const totalMins = weekItems.reduce((s, w) => s + w.duration, 0);
-  const totalCal = weekItems.reduce((s, w) => s + (w.calories ?? 0), 0);
-  const sorted = [...items].sort((a, b) => b.date.localeCompare(a.date));
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const d = parseInt(duration);
-    if (!d || d <= 0) return;
-    await add({ type, duration: d, calories: calories ? parseInt(calories) : undefined, date, notes: notes || undefined });
-    setDuration(''); setCalories(''); setNotes(''); setShowForm(false);
-  };
-
-  return (
-    <>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-        <StatCard label="이번 주 운동" value={weekItems.length} unit="회" icon={Activity} color={C.teal} />
-        <StatCard label="총 운동 시간" value={fmtDuration(totalMins)} unit="" icon={Clock} color={C.blue} />
-        <StatCard label="소모 칼로리" value={totalCal} unit="kcal" icon={Flame} color={C.amber} />
-      </div>
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
-        {WORKOUT_TYPES.map((t) => (
-          <button
-            key={t}
-            onClick={() => { setType(t); setShowForm(true); }}
-            style={{
-              padding: '5px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontFamily: font,
-              background: type === t && showForm ? `${C.teal}20` : C.bg2,
-              border: `1px solid ${type === t && showForm ? C.teal : C.b1}`,
-              color: type === t && showForm ? C.teal : C.t1,
-            }}
-          >{TYPE_EMOJI[t]} {t}</button>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-        {loading && <p style={{ color: C.t2, fontSize: 13 }}>불러오는 중...</p>}
-        {sorted.map((w) => (
-          <div key={w.id} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: `${C.teal}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
-              {TYPE_EMOJI[w.type] ?? '💪'}
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ color: C.t0, fontSize: 13.5 }}>{w.type}</p>
-              <p style={{ color: C.t1, fontSize: 11, marginTop: 2 }}>{w.date}{w.notes && ` · ${w.notes}`}</p>
-            </div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <span style={{ color: C.blue, fontSize: 12, fontFamily: mono, display: 'flex', alignItems: 'center', gap: 3 }}><Clock size={10} />{fmtDuration(w.duration)}</span>
-              {w.calories && <span style={{ color: C.amber, fontSize: 12, fontFamily: mono, display: 'flex', alignItems: 'center', gap: 3 }}><Flame size={10} />{w.calories}kcal</span>}
-            </div>
-            <button onClick={() => remove(w.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex' }}><Trash2 size={13} /></button>
-          </div>
-        ))}
-        {items.length === 0 && !loading && <p style={{ color: C.t2, fontSize: 13, padding: '20px 0' }}>운동 기록이 없습니다.</p>}
-      </div>
-
-      {showForm ? (
-        <form onSubmit={handleAdd} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <select value={type} onChange={(e) => setType(e.target.value)} style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>
-            {WORKOUT_TYPES.map((t) => <option key={t} value={t}>{TYPE_EMOJI[t]} {t}</option>)}
-          </select>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="운동 시간 (분)" inputMode="numeric" style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, outline: 'none' }} />
-            <input value={calories} onChange={(e) => setCalories(e.target.value)} placeholder="칼로리 (선택)" inputMode="numeric" style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, outline: 'none' }} />
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, colorScheme: 'dark' }} />
-            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="메모 (선택)" style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none' }} />
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="submit" style={{ flex: 1, padding: 9, background: C.teal, color: '#06091A', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: font, cursor: 'pointer' }}>기록 추가</button>
-            <button type="button" onClick={() => setShowForm(false)} style={{ padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
-          </div>
-        </form>
-      ) : (
-        <button onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}>
-          <Plus size={14} />운동 기록 추가
-        </button>
-      )}
-    </>
-  );
-}
-
-// ─── Sleep Tab ────────────────────────────────────────────────────────────────
-function SleepTab() {
-  const { sleepLogs, loading, addSleepLog, removeSleepLog } = useHealthStore();
-  const [showForm, setShowForm] = useState(false);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [bedTime, setBedTime] = useState('23:00');
-  const [wakeTime, setWakeTime] = useState('07:00');
-  const [quality, setQuality] = useState<SleepLog['quality']>(3);
-  const [notes, setNotes] = useState('');
-
-  const weekStart = getWeekStart();
-  const weekLogs = sleepLogs.filter((l) => l.date >= weekStart);
-  const avgDuration = weekLogs.length > 0
-    ? Math.round(weekLogs.reduce((s, l) => s + l.duration, 0) / weekLogs.length)
-    : 0;
-  const avgQuality = weekLogs.length > 0
-    ? +(weekLogs.reduce((s, l) => s + l.quality, 0) / weekLogs.length).toFixed(1)
-    : 0;
-
-  const sorted = [...sleepLogs].sort((a, b) => b.date.localeCompare(a.date));
-
-  const qualityColor = (q: number) => q >= 4 ? C.teal : q >= 3 ? C.amber : C.rose;
-  const qualityLabel = (q: number) => (['', '나쁨', '별로', '보통', '좋음', '매우 좋음'] as const)[q] ?? '';
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const duration = calcSleepDuration(bedTime, wakeTime);
-    await addSleepLog({ date, bedTime, wakeTime, duration, quality, notes: notes || undefined });
-    setNotes(''); setShowForm(false);
-  };
-
-  return (
-    <>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-        <StatCard label="이번 주 기록" value={weekLogs.length} unit="일" icon={Moon} color={C.violet} />
-        <StatCard label="평균 수면 시간" value={avgDuration ? fmtDuration(avgDuration) : '-'} unit="" icon={Clock} color={C.sky} />
-        <StatCard label="평균 수면 질" value={avgQuality || '-'} unit="/ 5" icon={Star} color={C.amber} />
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-        {loading && <p style={{ color: C.t2, fontSize: 13 }}>불러오는 중...</p>}
-        {sorted.map((l) => (
-          <div key={l.id} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: `${C.violet}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
-              🌙
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: C.t0, fontSize: 13.5 }}>{l.date}</span>
-                <span style={{ color: qualityColor(l.quality), fontSize: 11, fontFamily: mono }}>{qualityLabel(l.quality)}</span>
-              </div>
-              <p style={{ color: C.t1, fontSize: 11, marginTop: 2 }}>
-                {l.bedTime} → {l.wakeTime}{l.notes && ` · ${l.notes}`}
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <span style={{ color: C.sky, fontSize: 12, fontFamily: mono, display: 'flex', alignItems: 'center', gap: 3 }}>
-                <Clock size={10} />{fmtDuration(l.duration)}
-              </span>
-              <QualityStars q={l.quality} />
-            </div>
-            <button onClick={() => removeSleepLog(l.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex' }}><Trash2 size={13} /></button>
-          </div>
-        ))}
-        {sleepLogs.length === 0 && !loading && <p style={{ color: C.t2, fontSize: 13, padding: '20px 0' }}>수면 기록이 없습니다.</p>}
-      </div>
-
-      {showForm ? (
-        <form onSubmit={handleAdd} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, colorScheme: 'dark' }} />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1 }}>
-              <p style={{ color: C.t1, fontSize: 11, marginBottom: 4 }}>취침 시간</p>
-              <input type="time" value={bedTime} onChange={(e) => setBedTime(e.target.value)} style={{ width: '100%', background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, colorScheme: 'dark' }} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ color: C.t1, fontSize: 11, marginBottom: 4 }}>기상 시간</p>
-              <input type="time" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)} style={{ width: '100%', background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, colorScheme: 'dark' }} />
-            </div>
-          </div>
-          <div>
-            <p style={{ color: C.t1, fontSize: 11, marginBottom: 6 }}>수면 질 — {qualityLabel(quality)}</p>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {([1, 2, 3, 4, 5] as const).map((q) => (
-                <button
-                  key={q} type="button" onClick={() => setQuality(q)}
-                  style={{
-                    flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: font,
-                    background: quality === q ? `${qualityColor(q)}20` : C.bg1,
-                    border: `1px solid ${quality === q ? qualityColor(q) : C.b1}`,
-                    color: quality === q ? qualityColor(q) : C.t1,
-                  }}
-                >{q}점</button>
-              ))}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ color: C.sky, fontSize: 12, fontFamily: mono, flexShrink: 0 }}>
-              {fmtDuration(calcSleepDuration(bedTime, wakeTime))}
-            </span>
-            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="메모 (선택)" style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none' }} />
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="submit" style={{ flex: 1, padding: 9, background: C.violet, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: font, cursor: 'pointer' }}>기록 추가</button>
-            <button type="button" onClick={() => setShowForm(false)} style={{ padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
-          </div>
-        </form>
-      ) : (
-        <button onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}>
-          <Plus size={14} />수면 기록 추가
-        </button>
-      )}
-    </>
-  );
-}
-
-// ─── Dashboard Tab ────────────────────────────────────────────────────────────
+// Dashboard tab is read-only and self-contained
 function DashboardTab() {
   const { items, sleepLogs } = useHealthStore();
-
   const today = new Date().toISOString().split('T')[0];
   const weekStart = getWeekStart();
 
@@ -332,7 +121,7 @@ function DashboardTab() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 24 }}>
         {[
           { label: '이번 주 운동', value: `${weekWorkouts.length}회`, color: C.teal },
           { label: '총 소모 칼로리', value: `${totalWeekCal}kcal`, color: C.amber },
@@ -404,10 +193,136 @@ function DashboardTab() {
 
 // ─── Main View ────────────────────────────────────────────────────────────────
 export function HealthView() {
-  const { fetch } = useHealthStore();
+  const { items, sleepLogs, loading, add, remove, addSleepLog, removeSleepLog, fetch } = useHealthStore();
+  const { isMobile } = useWindowSize();
   const [tab, setTab] = useState<'workout' | 'sleep' | 'dashboard'>('dashboard');
 
+  // Workout form
+  const [showWorkoutForm, setShowWorkoutForm] = useState(false);
+  const [workoutType, setWorkoutType] = useState('달리기');
+  const [duration, setDuration] = useState('');
+  const [calories, setCalories] = useState('');
+  const [workoutDate, setWorkoutDate] = useState(new Date().toISOString().split('T')[0]);
+  const [workoutNotes, setWorkoutNotes] = useState('');
+
+  // Sleep form
+  const [showSleepForm, setShowSleepForm] = useState(false);
+  const [sleepDate, setSleepDate] = useState(new Date().toISOString().split('T')[0]);
+  const [bedTime, setBedTime] = useState('23:00');
+  const [wakeTime, setWakeTime] = useState('07:00');
+  const [quality, setQuality] = useState<SleepLog['quality']>(3);
+  const [sleepNotes, setSleepNotes] = useState('');
+
   useEffect(() => { fetch(); }, [fetch]);
+
+  const weekStart = getWeekStart();
+  const weekItems = items.filter((w) => w.date >= weekStart);
+  const totalMins = weekItems.reduce((s, w) => s + w.duration, 0);
+  const totalCal = weekItems.reduce((s, w) => s + (w.calories ?? 0), 0);
+  const sortedWorkouts = [...items].sort((a, b) => b.date.localeCompare(a.date));
+
+  const weekSleepLogs = sleepLogs.filter((l) => l.date >= weekStart);
+  const avgSleepDur = weekSleepLogs.length > 0
+    ? Math.round(weekSleepLogs.reduce((s, l) => s + l.duration, 0) / weekSleepLogs.length)
+    : 0;
+  const avgSleepQ = weekSleepLogs.length > 0
+    ? +(weekSleepLogs.reduce((s, l) => s + l.quality, 0) / weekSleepLogs.length).toFixed(1)
+    : 0;
+  const sortedSleep = [...sleepLogs].sort((a, b) => b.date.localeCompare(a.date));
+
+  const qualityColor = (q: number) => q >= 4 ? C.teal : q >= 3 ? C.amber : C.rose;
+  const qualityLabel = (q: number) => (['', '나쁨', '별로', '보통', '좋음', '매우 좋음'] as const)[q] ?? '';
+
+  const handleAddWorkout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const d = parseInt(duration);
+    if (!d || d <= 0) return;
+    await add({ type: workoutType, duration: d, calories: calories ? parseInt(calories) : undefined, date: workoutDate, notes: workoutNotes || undefined });
+    setDuration(''); setCalories(''); setWorkoutNotes('');
+    if (isMobile) setShowWorkoutForm(false);
+  };
+
+  const handleAddSleep = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const dur = calcSleepDuration(bedTime, wakeTime);
+    await addSleepLog({ date: sleepDate, bedTime, wakeTime, duration: dur, quality, notes: sleepNotes || undefined });
+    setSleepNotes('');
+    if (isMobile) setShowSleepForm(false);
+  };
+
+  const WorkoutForm = (
+    <form onSubmit={handleAddWorkout} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <select value={workoutType} onChange={(e) => setWorkoutType(e.target.value)}
+        style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>
+        {WORKOUT_TYPES.map((t) => <option key={t} value={t}>{TYPE_EMOJI[t]} {t}</option>)}
+      </select>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="운동 시간 (분)" inputMode="numeric"
+          style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, outline: 'none' }} />
+        <input value={calories} onChange={(e) => setCalories(e.target.value)} placeholder="칼로리 (선택)" inputMode="numeric"
+          style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, outline: 'none' }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input type="date" value={workoutDate} onChange={(e) => setWorkoutDate(e.target.value)}
+          style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, colorScheme: 'dark' }} />
+        <input value={workoutNotes} onChange={(e) => setWorkoutNotes(e.target.value)} placeholder="메모 (선택)"
+          style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none' }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="submit" style={{ flex: 1, padding: '9px', background: C.teal, color: '#06091A', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: font, cursor: 'pointer' }}>기록 추가</button>
+        {isMobile && (
+          <button type="button" onClick={() => setShowWorkoutForm(false)} style={{ padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
+        )}
+      </div>
+    </form>
+  );
+
+  const SleepForm = (
+    <form onSubmit={handleAddSleep} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <input type="date" value={sleepDate} onChange={(e) => setSleepDate(e.target.value)}
+        style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, colorScheme: 'dark', width: '100%', boxSizing: 'border-box' }} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <p style={{ color: C.t1, fontSize: 11, marginBottom: 4 }}>취침 시간</p>
+          <input type="time" value={bedTime} onChange={(e) => setBedTime(e.target.value)}
+            style={{ width: '100%', background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, colorScheme: 'dark', boxSizing: 'border-box' }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ color: C.t1, fontSize: 11, marginBottom: 4 }}>기상 시간</p>
+          <input type="time" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)}
+            style={{ width: '100%', background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: mono, colorScheme: 'dark', boxSizing: 'border-box' }} />
+        </div>
+      </div>
+      <div>
+        <p style={{ color: C.t1, fontSize: 11, marginBottom: 6 }}>수면 질 — {qualityLabel(quality)}</p>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {([1, 2, 3, 4, 5] as const).map((q) => (
+            <button key={q} type="button" onClick={() => setQuality(q)}
+              style={{
+                flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: font,
+                background: quality === q ? `${qualityColor(q)}20` : C.bg1,
+                border: `1px solid ${quality === q ? qualityColor(q) : C.b1}`,
+                color: quality === q ? qualityColor(q) : C.t1,
+              }}
+            >{q}점</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <span style={{ color: C.sky, fontSize: 12, fontFamily: mono, flexShrink: 0 }}>
+          {fmtDuration(calcSleepDuration(bedTime, wakeTime))}
+        </span>
+        <input value={sleepNotes} onChange={(e) => setSleepNotes(e.target.value)} placeholder="메모 (선택)"
+          style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none' }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="submit" style={{ flex: 1, padding: '9px', background: C.violet, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: font, cursor: 'pointer' }}>기록 추가</button>
+        {isMobile && (
+          <button type="button" onClick={() => setShowSleepForm(false)} style={{ padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
+        )}
+      </div>
+    </form>
+  );
 
   const tabs = [
     { id: 'dashboard' as const, label: '대시보드', icon: BarChart2, color: C.blue },
@@ -416,33 +331,193 @@ export function HealthView() {
   ];
 
   return (
-    <div style={{ fontFamily: font }}>
-      <div style={{ marginBottom: 12 }}>
-        <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>건강</h1>
+    <div style={{ fontFamily: font, display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+
+      {/* ── Left column ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ marginBottom: 12 }}>
+          <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>건강</h1>
+        </div>
+
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 4, width: 'fit-content' }}>
+          {tabs.map(({ id, label, icon: Icon, color }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 7,
+                fontSize: 12.5, cursor: 'pointer', fontFamily: font,
+                background: tab === id ? C.bg3 : 'transparent',
+                border: `1px solid ${tab === id ? C.b1 : 'transparent'}`,
+                color: tab === id ? C.t0 : C.t1,
+              }}
+            >
+              <Icon size={13} color={tab === id ? color : C.t1} />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'dashboard' && <DashboardTab />}
+
+        {tab === 'workout' && (
+          <>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+              <StatCard label="이번 주 운동" value={weekItems.length} unit="회" icon={Activity} color={C.teal} />
+              <StatCard label="총 운동 시간" value={fmtDuration(totalMins)} unit="" icon={Clock} color={C.blue} />
+              <StatCard label="소모 칼로리" value={totalCal} unit="kcal" icon={Flame} color={C.amber} />
+            </div>
+
+            {/* Type pills: mobile only (desktop shows in right panel) */}
+            {isMobile && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
+                {WORKOUT_TYPES.map((t) => (
+                  <button key={t} onClick={() => { setWorkoutType(t); setShowWorkoutForm(true); }}
+                    style={{
+                      padding: '5px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontFamily: font,
+                      background: workoutType === t && showWorkoutForm ? `${C.teal}20` : C.bg2,
+                      border: `1px solid ${workoutType === t && showWorkoutForm ? C.teal : C.b1}`,
+                      color: workoutType === t && showWorkoutForm ? C.teal : C.t1,
+                    }}
+                  >{TYPE_EMOJI[t]} {t}</button>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+              {loading && <p style={{ color: C.t2, fontSize: 13 }}>불러오는 중...</p>}
+              {sortedWorkouts.map((w) => (
+                <div key={w.id} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: `${C.teal}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                    {TYPE_EMOJI[w.type] ?? '💪'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ color: C.t0, fontSize: 13.5 }}>{w.type}</p>
+                    <p style={{ color: C.t1, fontSize: 11, marginTop: 2 }}>{w.date}{w.notes && ` · ${w.notes}`}</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <span style={{ color: C.blue, fontSize: 12, fontFamily: mono, display: 'flex', alignItems: 'center', gap: 3 }}><Clock size={10} />{fmtDuration(w.duration)}</span>
+                    {w.calories && <span style={{ color: C.amber, fontSize: 12, fontFamily: mono, display: 'flex', alignItems: 'center', gap: 3 }}><Flame size={10} />{w.calories}kcal</span>}
+                  </div>
+                  <button onClick={() => remove(w.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex' }}><Trash2 size={13} /></button>
+                </div>
+              ))}
+              {items.length === 0 && !loading && <p style={{ color: C.t2, fontSize: 13, padding: '20px 0' }}>운동 기록이 없습니다.</p>}
+            </div>
+
+            {isMobile && (
+              showWorkoutForm ? WorkoutForm : (
+                <button onClick={() => setShowWorkoutForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}>
+                  <Plus size={14} />운동 기록 추가
+                </button>
+              )
+            )}
+          </>
+        )}
+
+        {tab === 'sleep' && (
+          <>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+              <StatCard label="이번 주 기록" value={weekSleepLogs.length} unit="일" icon={Moon} color={C.violet} />
+              <StatCard label="평균 수면 시간" value={avgSleepDur ? fmtDuration(avgSleepDur) : '-'} unit="" icon={Clock} color={C.sky} />
+              <StatCard label="평균 수면 질" value={avgSleepQ || '-'} unit="/ 5" icon={Star} color={C.amber} />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+              {loading && <p style={{ color: C.t2, fontSize: 13 }}>불러오는 중...</p>}
+              {sortedSleep.map((l) => (
+                <div key={l.id} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, background: `${C.violet}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                    🌙
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: C.t0, fontSize: 13.5 }}>{l.date}</span>
+                      <span style={{ color: qualityColor(l.quality), fontSize: 11, fontFamily: mono }}>{qualityLabel(l.quality)}</span>
+                    </div>
+                    <p style={{ color: C.t1, fontSize: 11, marginTop: 2 }}>
+                      {l.bedTime} → {l.wakeTime}{l.notes && ` · ${l.notes}`}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <span style={{ color: C.sky, fontSize: 12, fontFamily: mono, display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <Clock size={10} />{fmtDuration(l.duration)}
+                    </span>
+                    <QualityStars q={l.quality} />
+                  </div>
+                  <button onClick={() => removeSleepLog(l.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex' }}><Trash2 size={13} /></button>
+                </div>
+              ))}
+              {sleepLogs.length === 0 && !loading && <p style={{ color: C.t2, fontSize: 13, padding: '20px 0' }}>수면 기록이 없습니다.</p>}
+            </div>
+
+            {isMobile && (
+              showSleepForm ? SleepForm : (
+                <button onClick={() => setShowSleepForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}>
+                  <Plus size={14} />수면 기록 추가
+                </button>
+              )
+            )}
+          </>
+        )}
       </div>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 4, width: 'fit-content' }}>
-        {tabs.map(({ id, label, icon: Icon, color }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 7,
-              fontSize: 12.5, cursor: 'pointer', fontFamily: font,
-              background: tab === id ? C.bg3 : 'transparent',
-              border: `1px solid ${tab === id ? C.b1 : 'transparent'}`,
-              color: tab === id ? C.t0 : C.t1,
-            }}
-          >
-            <Icon size={13} color={tab === id ? color : C.t1} />
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* ── Right panel: desktop only ── */}
+      {!isMobile && (
+        <div style={{ width: 264, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {tab === 'dashboard' && <DashboardTab />}
-      {tab === 'workout' && <WorkoutTab />}
-      {tab === 'sleep' && <SleepTab />}
+          {tab === 'dashboard' && (
+            <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+              <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>빠른 이동</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button onClick={() => setTab('workout')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: `${C.teal}10`, border: `1px solid ${C.teal}30`, borderRadius: 10, cursor: 'pointer', fontFamily: font }}>
+                  <Activity size={14} color={C.teal} />
+                  <span style={{ color: C.teal, fontSize: 13, fontWeight: 600 }}>운동 기록 추가</span>
+                </button>
+                <button onClick={() => setTab('sleep')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: `${C.violet}10`, border: `1px solid ${C.violet}30`, borderRadius: 10, cursor: 'pointer', fontFamily: font }}>
+                  <Moon size={14} color={C.violet} />
+                  <span style={{ color: C.violet, fontSize: 13, fontWeight: 600 }}>수면 기록 추가</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {tab === 'workout' && (
+            <>
+              {/* Type quick-select */}
+              <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+                <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 10 }}>운동 종류</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {WORKOUT_TYPES.map((t) => (
+                    <button key={t} onClick={() => setWorkoutType(t)}
+                      style={{
+                        padding: '5px 10px', borderRadius: 16, fontSize: 11.5, cursor: 'pointer', fontFamily: font,
+                        background: workoutType === t ? `${C.teal}20` : C.bg1,
+                        border: `1px solid ${workoutType === t ? C.teal : C.b1}`,
+                        color: workoutType === t ? C.teal : C.t1,
+                      }}
+                    >{TYPE_EMOJI[t]} {t}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+                <p style={{ color: C.teal, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>운동 기록</p>
+                {WorkoutForm}
+              </div>
+            </>
+          )}
+
+          {tab === 'sleep' && (
+            <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+              <p style={{ color: C.violet, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>수면 기록</p>
+              {SleepForm}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
