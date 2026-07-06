@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer,
 } from 'recharts';
-import { ChevronRight, Loader, Zap, Target, Brain, GitBranch, RefreshCw, Plus, Trash2, Award, Layers, MapPin, CheckCircle2, Circle, PauseCircle } from 'lucide-react';
-import { useCareerStore, type CareerTarget, type CareerPath, type CoachLog, type Skill, type Achievement, type SkillLevel, type CareerGoal, type GoalHorizon } from '../../shared/stores/career.store';
+import { ChevronRight, Loader, Zap, Target, Brain, GitBranch, RefreshCw, Plus, Trash2, Award, Layers, MapPin, CheckCircle2, Circle, PauseCircle, Briefcase, BookOpen, GraduationCap, Smile, Frown, Meh } from 'lucide-react';
+import { useCareerStore, type CareerTarget, type CareerPath, type CoachLog, type Skill, type Achievement, type SkillLevel, type CareerGoal, type GoalHorizon, type JobApplication, type JobStage, type GrowthJournal, type Certification, type CertStatus } from '../../shared/stores/career.store';
+import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
 const C = {
   bg2: '#0D1228', bg3: '#131B32',
@@ -781,11 +782,444 @@ function CoachTab() {
 }
 
 // ---------------------------------------------------------------------------
+// Pipeline Tab (CAR-05)
+// ---------------------------------------------------------------------------
+const STAGE_META: Record<JobStage, { label: string; color: string }> = {
+  research:  { label: '리서치',  color: C.t1 },
+  applied:   { label: '지원',    color: C.sky },
+  screening: { label: '서류',    color: C.blue },
+  interview: { label: '면접',    color: C.violet },
+  offer:     { label: '오퍼',    color: C.amber },
+  accepted:  { label: '합격',    color: C.teal },
+  rejected:  { label: '불합격',  color: C.rose },
+};
+
+function PipelineTab() {
+  const { jobApplications, addJobApplication, updateJobApplication, removeJobApplication } = useCareerStore();
+  const { isMobile } = useWindowSize();
+  const inp: React.CSSProperties = {
+    background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8,
+    padding: '9px 12px', color: C.t0, fontSize: 13.5, fontFamily: font,
+    outline: 'none', width: '100%', boxSizing: 'border-box',
+  };
+  const sel: React.CSSProperties = { ...inp, cursor: 'pointer' };
+
+  const [company, setCompany] = useState('');
+  const [position, setPosition] = useState('');
+  const [stage, setStage] = useState<JobStage>('research');
+  const [notes, setNotes] = useState('');
+  const [showForm, setShowForm] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!company.trim() || !position.trim()) return;
+    await addJobApplication({ company: company.trim(), position: position.trim(), stage, notes: notes.trim() || undefined });
+    setCompany(''); setPosition(''); setNotes(''); setStage('research');
+    if (isMobile) setShowForm(false);
+  };
+
+  const activeStages: JobStage[] = ['research', 'applied', 'screening', 'interview', 'offer'];
+  const activeApps = jobApplications.filter((j) => activeStages.includes(j.stage));
+  const accepted = jobApplications.filter((j) => j.stage === 'accepted').length;
+  const rejected = jobApplications.filter((j) => j.stage === 'rejected').length;
+
+  const AppForm = (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="회사명" style={inp} />
+      <input value={position} onChange={(e) => setPosition(e.target.value)} placeholder="포지션" style={inp} />
+      <select value={stage} onChange={(e) => setStage(e.target.value as JobStage)} style={sel}>
+        {(Object.keys(STAGE_META) as JobStage[]).map((s) => (
+          <option key={s} value={s}>{STAGE_META[s].label}</option>
+        ))}
+      </select>
+      <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="메모 (선택)" rows={2}
+        style={{ ...inp, resize: 'vertical' }} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="submit" style={{ flex: 1, padding: '9px', background: C.amber, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer' }}>추가</button>
+        {isMobile && <button type="button" onClick={() => setShowForm(false)} style={{ padding: '9px 14px', background: C.bg2, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>}
+      </div>
+    </form>
+  );
+
+  return (
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {activeStages.map((s) => {
+          const apps = jobApplications.filter((j) => j.stage === s);
+          return (
+            <div key={s} style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: STAGE_META[s].color }} />
+                <span style={{ color: STAGE_META[s].color, fontSize: 12.5, fontWeight: 600 }}>{STAGE_META[s].label}</span>
+                <span style={{ color: C.t2, fontSize: 11, fontFamily: mono }}>({apps.length})</span>
+              </div>
+              {apps.map((app) => (
+                <div key={app.id} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: C.t0, fontSize: 13.5, fontWeight: 600 }}>{app.company}</div>
+                    <div style={{ color: C.t1, fontSize: 12.5, marginTop: 2 }}>{app.position}</div>
+                    {app.notes && <div style={{ color: C.t2, fontSize: 11.5, marginTop: 4 }}>{app.notes}</div>}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                    <select
+                      value={app.stage}
+                      onChange={(e) => updateJobApplication(app.id, { stage: e.target.value as JobStage })}
+                      style={{ background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 6, padding: '4px 8px', color: STAGE_META[app.stage].color, fontSize: 11.5, fontFamily: font, cursor: 'pointer' }}
+                    >
+                      {(Object.keys(STAGE_META) as JobStage[]).map((st) => (
+                        <option key={st} value={st}>{STAGE_META[st].label}</option>
+                      ))}
+                    </select>
+                    <button onClick={() => removeJobApplication(app.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex' }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {apps.length === 0 && <p style={{ color: C.t2, fontSize: 12, paddingLeft: 16, marginBottom: 4 }}>없음</p>}
+            </div>
+          );
+        })}
+
+        {isMobile && !showForm && (
+          <button onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}>
+            <Plus size={14} />지원 추가
+          </button>
+        )}
+        {isMobile && showForm && AppForm}
+      </div>
+
+      {!isMobile && (
+        <div style={{ width: 272, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>파이프라인 현황</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {[
+                { label: '진행 중', value: activeApps.length, color: C.amber },
+                { label: '합격', value: accepted, color: C.teal },
+                { label: '불합격', value: rejected, color: C.rose },
+                { label: '전체', value: jobApplications.length, color: C.sky },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: C.bg1, borderRadius: 9, padding: '10px 12px' }}>
+                  <div style={{ color, fontSize: 18, fontWeight: 700, fontFamily: mono }}>{value}</div>
+                  <div style={{ color: C.t1, fontSize: 11, marginTop: 2 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>지원 추가</p>
+            {AppForm}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Journal Tab (CAR-10)
+// ---------------------------------------------------------------------------
+const MOOD_META = [
+  { value: 1 as const, icon: Frown, label: '힘든', color: C.rose },
+  { value: 2 as const, icon: Frown, label: '지침', color: C.amber },
+  { value: 3 as const, icon: Meh, label: '보통', color: C.t1 },
+  { value: 4 as const, icon: Smile, label: '좋음', color: C.sky },
+  { value: 5 as const, icon: Smile, label: '최고', color: C.teal },
+];
+
+function JournalTab() {
+  const { growthJournals, addGrowthJournal, removeGrowthJournal } = useCareerStore();
+  const { isMobile } = useWindowSize();
+  const inp: React.CSSProperties = {
+    background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8,
+    padding: '9px 12px', color: C.t0, fontSize: 13.5, fontFamily: font,
+    outline: 'none', width: '100%', boxSizing: 'border-box',
+  };
+  const ta: React.CSSProperties = { ...inp, resize: 'vertical' };
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [lessons, setLessons] = useState('');
+  const [challenges, setChallenges] = useState('');
+  const [wins, setWins] = useState('');
+  const [goalsNext, setGoalsNext] = useState('');
+  const [mood, setMood] = useState<1 | 2 | 3 | 4 | 5>(3);
+  const [showForm, setShowForm] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lessons.trim() || !challenges.trim()) return;
+    await addGrowthJournal({ date, lessonsLearned: lessons.trim(), challenges: challenges.trim(), wins: wins.trim() || undefined, goalsNextWeek: goalsNext.trim() || undefined, mood });
+    setLessons(''); setChallenges(''); setWins(''); setGoalsNext(''); setMood(3); setDate(today);
+    if (isMobile) setShowForm(false);
+  };
+
+  const JournalForm = (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+        style={{ ...inp, colorScheme: 'dark' }} />
+      <div>
+        <label style={{ color: C.t1, fontSize: 11, display: 'block', marginBottom: 5 }}>기분</label>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {MOOD_META.map((m) => (
+            <button
+              key={m.value}
+              type="button"
+              onClick={() => setMood(m.value)}
+              style={{
+                flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 10, fontFamily: font, cursor: 'pointer',
+                background: mood === m.value ? `${m.color}22` : C.bg3,
+                border: `1px solid ${mood === m.value ? m.color : C.b1}`,
+                color: mood === m.value ? m.color : C.t2,
+              }}
+            >{m.label}</button>
+          ))}
+        </div>
+      </div>
+      <textarea value={lessons} onChange={(e) => setLessons(e.target.value)} placeholder="이번 주 배운 점 *" rows={2} style={ta} />
+      <textarea value={challenges} onChange={(e) => setChallenges(e.target.value)} placeholder="챌린지/어려웠던 점 *" rows={2} style={ta} />
+      <textarea value={wins} onChange={(e) => setWins(e.target.value)} placeholder="성과/좋았던 점 (선택)" rows={2} style={ta} />
+      <textarea value={goalsNext} onChange={(e) => setGoalsNext(e.target.value)} placeholder="다음 주 목표 (선택)" rows={2} style={ta} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="submit" style={{ flex: 1, padding: '9px', background: C.violet, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer' }}>저장</button>
+        {isMobile && <button type="button" onClick={() => setShowForm(false)} style={{ padding: '9px 14px', background: C.bg2, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>}
+      </div>
+    </form>
+  );
+
+  const sorted = [...growthJournals].sort((a, b) => b.date.localeCompare(a.date));
+
+  return (
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {sorted.map((j) => {
+          const moodMeta = MOOD_META.find((m) => m.value === j.mood) ?? MOOD_META[2];
+          const isOpen = expanded === j.id;
+          return (
+            <div key={j.id} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, marginBottom: 10 }}>
+              <button
+                onClick={() => setExpanded(isOpen ? null : j.id)}
+                style={{ width: '100%', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+              >
+                <span style={{ color: moodMeta.color, fontSize: 11, fontWeight: 600, background: `${moodMeta.color}18`, borderRadius: 5, padding: '2px 8px' }}>{moodMeta.label}</span>
+                <span style={{ color: C.t0, fontSize: 13.5, fontWeight: 600, flex: 1, textAlign: 'left' }}>{j.date}</span>
+                <ChevronRight size={13} color={C.t1} style={{ transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+              </button>
+              {isOpen && (
+                <div style={{ padding: '0 14px 14px' }}>
+                  <div style={{ color: C.t2, fontSize: 11, marginBottom: 6, display: 'flex', gap: 10 }}>
+                    <span>💡 배운 점</span>
+                  </div>
+                  <p style={{ color: C.t0, fontSize: 13, marginBottom: 10 }}>{j.lessonsLearned}</p>
+                  <div style={{ color: C.t2, fontSize: 11, marginBottom: 6 }}>⚠️ 챌린지</div>
+                  <p style={{ color: C.t0, fontSize: 13, marginBottom: j.wins ? 10 : 0 }}>{j.challenges}</p>
+                  {j.wins && (
+                    <>
+                      <div style={{ color: C.t2, fontSize: 11, marginBottom: 6, marginTop: 6 }}>🎉 성과</div>
+                      <p style={{ color: C.t0, fontSize: 13 }}>{j.wins}</p>
+                    </>
+                  )}
+                  {j.goalsNextWeek && (
+                    <>
+                      <div style={{ color: C.t2, fontSize: 11, marginBottom: 6, marginTop: 6 }}>🎯 다음 주 목표</div>
+                      <p style={{ color: C.t0, fontSize: 13 }}>{j.goalsNextWeek}</p>
+                    </>
+                  )}
+                  <button onClick={() => removeGrowthJournal(j.id)} style={{ color: C.rose, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, marginTop: 10 }}>
+                    <Trash2 size={11} />삭제
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {sorted.length === 0 && (
+          <p style={{ color: C.t2, fontSize: 13, padding: '30px 0' }}>성장 저널이 없습니다. 첫 회고를 작성해보세요!</p>
+        )}
+
+        {isMobile && !showForm && (
+          <button onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0', marginTop: 8 }}>
+            <Plus size={14} />새 회고 작성
+          </button>
+        )}
+        {isMobile && showForm && JournalForm}
+      </div>
+
+      {!isMobile && (
+        <div style={{ width: 272, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>회고 현황</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {[
+                { label: '총 회고', value: growthJournals.length, color: C.violet },
+                { label: '이번 달', value: growthJournals.filter((j) => j.date.startsWith(new Date().toISOString().slice(0, 7))).length, color: C.sky },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: C.bg1, borderRadius: 9, padding: '10px 12px' }}>
+                  <div style={{ color, fontSize: 18, fontWeight: 700, fontFamily: mono }}>{value}</div>
+                  <div style={{ color: C.t1, fontSize: 11, marginTop: 2 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>새 회고</p>
+            {JournalForm}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Certifications Tab (CAR-11)
+// ---------------------------------------------------------------------------
+const CERT_STATUS_META: Record<CertStatus, { label: string; color: string }> = {
+  planned:  { label: '계획', color: C.t1 },
+  studying: { label: '준비 중', color: C.amber },
+  obtained: { label: '취득', color: C.teal },
+  expired:  { label: '만료', color: C.rose },
+};
+
+function CertsTab() {
+  const { certifications, addCertification, updateCertification, removeCertification } = useCareerStore();
+  const { isMobile } = useWindowSize();
+  const inp: React.CSSProperties = {
+    background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8,
+    padding: '9px 12px', color: C.t0, fontSize: 13.5, fontFamily: font,
+    outline: 'none', width: '100%', boxSizing: 'border-box',
+  };
+  const sel: React.CSSProperties = { ...inp, cursor: 'pointer' };
+
+  const [name, setName] = useState('');
+  const [issuer, setIssuer] = useState('');
+  const [status, setStatus] = useState<CertStatus>('planned');
+  const [obtainedDate, setObtainedDate] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [showForm, setShowForm] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !issuer.trim()) return;
+    await addCertification({ name: name.trim(), issuer: issuer.trim(), status, obtainedDate: obtainedDate || undefined, expiryDate: expiryDate || undefined });
+    setName(''); setIssuer(''); setStatus('planned'); setObtainedDate(''); setExpiryDate('');
+    if (isMobile) setShowForm(false);
+  };
+
+  const CertForm = (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="자격증명 (예: AWS SAA)" style={inp} />
+      <input value={issuer} onChange={(e) => setIssuer(e.target.value)} placeholder="발급 기관" style={inp} />
+      <select value={status} onChange={(e) => setStatus(e.target.value as CertStatus)} style={sel}>
+        {(Object.keys(CERT_STATUS_META) as CertStatus[]).map((s) => (
+          <option key={s} value={s}>{CERT_STATUS_META[s].label}</option>
+        ))}
+      </select>
+      {(status === 'obtained' || status === 'expired') && (
+        <input type="date" value={obtainedDate} onChange={(e) => setObtainedDate(e.target.value)}
+          placeholder="취득일" style={{ ...inp, colorScheme: 'dark' }} />
+      )}
+      {(status === 'obtained' || status === 'expired') && (
+        <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
+          placeholder="만료일" style={{ ...inp, colorScheme: 'dark' }} />
+      )}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="submit" style={{ flex: 1, padding: '9px', background: C.teal, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer' }}>추가</button>
+        {isMobile && <button type="button" onClick={() => setShowForm(false)} style={{ padding: '9px 14px', background: C.bg2, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>}
+      </div>
+    </form>
+  );
+
+  const byStatus = (Object.keys(CERT_STATUS_META) as CertStatus[]).map((s) => ({
+    s,
+    certs: certifications.filter((c) => c.status === s),
+  })).filter(({ certs }) => certs.length > 0);
+
+  return (
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {certifications.length === 0 && (
+          <p style={{ color: C.t2, fontSize: 13, padding: '30px 0' }}>자격증이 없습니다. 취득했거나 준비 중인 자격증을 추가해보세요.</p>
+        )}
+        {byStatus.map(({ s, certs }) => (
+          <div key={s} style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: CERT_STATUS_META[s].color }} />
+              <span style={{ color: CERT_STATUS_META[s].color, fontSize: 12.5, fontWeight: 600 }}>{CERT_STATUS_META[s].label}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+              {certs.map((cert) => (
+                <div key={cert.id} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px', position: 'relative' }}>
+                  <div style={{ color: C.t0, fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{cert.name}</div>
+                  <div style={{ color: C.t1, fontSize: 12.5, marginBottom: 8 }}>{cert.issuer}</div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <select
+                      value={cert.status}
+                      onChange={(e) => updateCertification(cert.id, { status: e.target.value as CertStatus })}
+                      style={{ background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 6, padding: '4px 8px', color: CERT_STATUS_META[cert.status].color, fontSize: 11.5, fontFamily: font, cursor: 'pointer' }}
+                    >
+                      {(Object.keys(CERT_STATUS_META) as CertStatus[]).map((st) => (
+                        <option key={st} value={st}>{CERT_STATUS_META[st].label}</option>
+                      ))}
+                    </select>
+                    {cert.obtainedDate && <span style={{ color: C.t2, fontSize: 10.5, fontFamily: mono }}>{cert.obtainedDate}</span>}
+                    <button onClick={() => removeCertification(cert.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex', marginLeft: 'auto' }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                  {cert.expiryDate && (
+                    <div style={{ color: cert.status === 'expired' ? C.rose : C.t2, fontSize: 10.5, marginTop: 6, fontFamily: mono }}>
+                      만료: {cert.expiryDate}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {isMobile && !showForm && (
+          <button onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0', marginTop: 8 }}>
+            <Plus size={14} />자격증 추가
+          </button>
+        )}
+        {isMobile && showForm && CertForm}
+      </div>
+
+      {!isMobile && (
+        <div style={{ width: 272, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>자격증 현황</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {(Object.keys(CERT_STATUS_META) as CertStatus[]).map((s) => {
+                const count = certifications.filter((c) => c.status === s).length;
+                return (
+                  <div key={s} style={{ background: C.bg1, borderRadius: 9, padding: '10px 12px' }}>
+                    <div style={{ color: CERT_STATUS_META[s].color, fontSize: 18, fontWeight: 700, fontFamily: mono }}>{count}</div>
+                    <div style={{ color: C.t1, fontSize: 11, marginTop: 2 }}>{CERT_STATUS_META[s].label}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>자격증 추가</p>
+            {CertForm}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 export function CareerView() {
   const { fetch } = useCareerStore();
-  const [tab, setTab] = useState<'coach' | 'roadmap' | 'skills' | 'achievements'>('coach');
+  const [tab, setTab] = useState<'coach' | 'roadmap' | 'skills' | 'achievements' | 'pipeline' | 'journal' | 'certs'>('coach');
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -794,6 +1228,9 @@ export function CareerView() {
     { id: 'roadmap' as const, label: '로드맵', icon: MapPin, color: C.sky },
     { id: 'skills' as const, label: '스킬', icon: Layers, color: C.blue },
     { id: 'achievements' as const, label: '성과', icon: Award, color: C.teal },
+    { id: 'pipeline' as const, label: '파이프라인', icon: Briefcase, color: C.amber },
+    { id: 'journal' as const, label: '성장저널', icon: BookOpen, color: C.violet },
+    { id: 'certs' as const, label: '자격증', icon: GraduationCap, color: C.teal },
   ];
 
   return (
@@ -802,7 +1239,7 @@ export function CareerView() {
         <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>커리어</h1>
       </div>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 4, width: 'fit-content' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 16, background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 4 }}>
         {tabs.map(({ id, label, icon: Icon, color }) => (
           <button
             key={id}
@@ -825,6 +1262,9 @@ export function CareerView() {
       {tab === 'roadmap' && <RoadmapTab />}
       {tab === 'skills' && <SkillsTab />}
       {tab === 'achievements' && <AchievementsTab />}
+      {tab === 'pipeline' && <PipelineTab />}
+      {tab === 'journal' && <JournalTab />}
+      {tab === 'certs' && <CertsTab />}
     </div>
   );
 }

@@ -84,6 +84,42 @@ export interface CoachLog {
   createdAt?: string;
 }
 
+export type JobStage = 'research' | 'applied' | 'screening' | 'interview' | 'offer' | 'accepted' | 'rejected';
+
+export interface JobApplication {
+  id: string;
+  company: string;
+  position: string;
+  stage: JobStage;
+  appliedDate?: string;
+  notes?: string;
+  nextAction?: string;
+  salary?: { min?: number; max?: number; offered?: number };
+  url?: string;
+}
+
+export interface GrowthJournal {
+  id: string;
+  date: string;
+  lessonsLearned: string;
+  challenges: string;
+  wins?: string;
+  goalsNextWeek?: string;
+  mood: 1 | 2 | 3 | 4 | 5;
+}
+
+export type CertStatus = 'planned' | 'studying' | 'obtained' | 'expired';
+
+export interface Certification {
+  id: string;
+  name: string;
+  issuer: string;
+  status: CertStatus;
+  obtainedDate?: string;
+  expiryDate?: string;
+  linkedLearningGoalId?: string;
+}
+
 interface CareerStore {
   target: CareerTarget | null;
   paths: CareerPath[];
@@ -91,6 +127,9 @@ interface CareerStore {
   skills: Skill[];
   achievements: Achievement[];
   careerGoals: CareerGoal[];
+  jobApplications: JobApplication[];
+  growthJournals: GrowthJournal[];
+  certifications: Certification[];
   loading: boolean;
   aiLoading: boolean;
   fetch: () => Promise<void>;
@@ -106,6 +145,14 @@ interface CareerStore {
   addCareerGoal: (data: Omit<CareerGoal, 'id'>) => Promise<void>;
   updateCareerGoal: (id: string, data: Partial<CareerGoal>) => Promise<void>;
   removeCareerGoal: (id: string) => Promise<void>;
+  addJobApplication: (data: Omit<JobApplication, 'id'>) => Promise<void>;
+  updateJobApplication: (id: string, data: Partial<JobApplication>) => Promise<void>;
+  removeJobApplication: (id: string) => Promise<void>;
+  addGrowthJournal: (data: Omit<GrowthJournal, 'id'>) => Promise<void>;
+  removeGrowthJournal: (id: string) => Promise<void>;
+  addCertification: (data: Omit<Certification, 'id'>) => Promise<void>;
+  updateCertification: (id: string, data: Partial<Certification>) => Promise<void>;
+  removeCertification: (id: string) => Promise<void>;
 }
 
 export const useCareerStore = create<CareerStore>((set, get) => ({
@@ -115,20 +162,34 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
   skills: [],
   achievements: [],
   careerGoals: [],
+  jobApplications: [],
+  growthJournals: [],
+  certifications: [],
   loading: false,
   aiLoading: false,
 
   fetch: async () => {
     set({ loading: true });
     try {
-      const [targets, skills, achievements, careerGoals] = await Promise.all([
+      const [targets, skills, achievements, careerGoals, jobApplications, growthJournals, certifications] = await Promise.all([
         api.get<CareerTarget[]>('/targets'),
         api.get<Skill[]>('/skills').catch(() => []),
         api.get<Achievement[]>('/achievements').catch(() => []),
         api.get<CareerGoal[]>('/career-goals').catch(() => []),
+        api.get<JobApplication[]>('/job-apps').catch(() => []),
+        api.get<GrowthJournal[]>('/journals').catch(() => []),
+        api.get<Certification[]>('/certs').catch(() => []),
       ]);
       const active = (targets ?? []).find((t) => t.status !== 'completed') ?? (targets ?? [])[0] ?? null;
-      set({ target: active ?? null, skills: skills ?? [], achievements: achievements ?? [], careerGoals: careerGoals ?? [] });
+      set({
+        target: active ?? null,
+        skills: skills ?? [],
+        achievements: achievements ?? [],
+        careerGoals: careerGoals ?? [],
+        jobApplications: jobApplications ?? [],
+        growthJournals: growthJournals ?? [],
+        certifications: certifications ?? [],
+      });
       if (active) {
         const [paths, logs] = await Promise.all([
           api.get<CareerPath[]>('/cpaths').catch(() => []),
@@ -283,6 +344,71 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
   removeCareerGoal: async (id) => {
     set((s) => ({ careerGoals: s.careerGoals.filter((g) => g.id !== id) }));
     await api.delete<unknown>(`/career-goals/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
+  },
+
+  addJobApplication: async (data) => {
+    try {
+      const item = await api.post<JobApplication>('/job-apps', data);
+      set((s) => ({ jobApplications: [item, ...s.jobApplications] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '지원 추가에 실패했습니다');
+      throw err;
+    }
+  },
+
+  updateJobApplication: async (id, data) => {
+    set((s) => ({ jobApplications: s.jobApplications.map((j) => (j.id === id ? { ...j, ...data } : j)) }));
+    await api.put<JobApplication>(`/job-apps/${id}`, data).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '업데이트에 실패했습니다');
+    });
+  },
+
+  removeJobApplication: async (id) => {
+    set((s) => ({ jobApplications: s.jobApplications.filter((j) => j.id !== id) }));
+    await api.delete<unknown>(`/job-apps/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
+  },
+
+  addGrowthJournal: async (data) => {
+    try {
+      const item = await api.post<GrowthJournal>('/journals', data);
+      set((s) => ({ growthJournals: [item, ...s.growthJournals] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '저널 추가에 실패했습니다');
+      throw err;
+    }
+  },
+
+  removeGrowthJournal: async (id) => {
+    set((s) => ({ growthJournals: s.growthJournals.filter((j) => j.id !== id) }));
+    await api.delete<unknown>(`/journals/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
+  },
+
+  addCertification: async (data) => {
+    try {
+      const item = await api.post<Certification>('/certs', data);
+      set((s) => ({ certifications: [item, ...s.certifications] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '자격증 추가에 실패했습니다');
+      throw err;
+    }
+  },
+
+  updateCertification: async (id, data) => {
+    set((s) => ({ certifications: s.certifications.map((c) => (c.id === id ? { ...c, ...data } : c)) }));
+    await api.put<Certification>(`/certs/${id}`, data).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '업데이트에 실패했습니다');
+    });
+  },
+
+  removeCertification: async (id) => {
+    set((s) => ({ certifications: s.certifications.filter((c) => c.id !== id) }));
+    await api.delete<unknown>(`/certs/${id}`).catch((err) => {
       useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
     });
   },

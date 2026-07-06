@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Circle, Plus, Trash2, Tag, Folder, FolderOpen, ChevronRight } from 'lucide-react';
-import { useTasksStore, type Priority, type Task, type Project } from '../../shared/stores/tasks.store';
+import { CheckCircle2, Circle, Plus, Trash2, Tag, Folder, FolderOpen, ChevronRight, LayoutList, Columns3 } from 'lucide-react';
+import { useTasksStore, type Priority, type Task, type TaskStatus, type Project } from '../../shared/stores/tasks.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
 const C = {
@@ -32,7 +32,7 @@ const inputStyle = {
   outline: 'none', width: '100%', boxSizing: 'border-box' as const,
 };
 
-type TabId = 'all' | 'projects' | 'done';
+type TabId = 'all' | 'kanban' | 'projects' | 'done';
 
 interface TaskRowProps {
   task: Task;
@@ -145,6 +145,71 @@ function TaskRow({ task, subtasks, projects, toggle, remove, onAddSubtask, inden
   );
 }
 
+const STATUS_COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
+  { id: 'todo', label: '할 일', color: C.sky },
+  { id: 'in_progress', label: '진행 중', color: C.amber },
+  { id: 'done', label: '완료', color: C.teal },
+];
+
+function getTaskStatus(task: Task): TaskStatus {
+  if (task.status) return task.status;
+  return task.done ? 'done' : 'todo';
+}
+
+interface KanbanCardProps {
+  task: Task;
+  projects: Project[];
+  onStatusChange: (id: string, status: TaskStatus) => void;
+  onRemove: (id: string) => void;
+}
+
+function KanbanCard({ task, projects, onStatusChange, onRemove }: KanbanCardProps) {
+  const col = projColor(projects, task.projectId);
+  return (
+    <div style={{
+      background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10,
+      padding: '12px 14px', marginBottom: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+        <span style={{ flex: 1, color: C.t0, fontSize: 13.5, lineHeight: 1.4 }}>{task.title}</span>
+        <button onClick={() => onRemove(task.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex', flexShrink: 0 }}>
+          <Trash2 size={12} />
+        </button>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+        <span style={{
+          fontSize: 10, fontWeight: 600, color: PRIORITY_COLOR[task.priority],
+          background: `${PRIORITY_COLOR[task.priority]}18`, borderRadius: 5, padding: '2px 7px',
+        }}>{PRIORITY_LABEL[task.priority]}</span>
+        {task.projectId && (
+          <span style={{ fontSize: 10, color: col, background: `${col}18`, borderRadius: 5, padding: '2px 7px', display: 'flex', alignItems: 'center', gap: 3 }}>
+            <Folder size={8} />{projects.find((p) => p.id === task.projectId)?.name}
+          </span>
+        )}
+        {task.due && <span style={{ fontSize: 10, fontFamily: mono, color: C.t2 }}>{task.due}</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 4 }}>
+        {STATUS_COLUMNS.map((col) => {
+          const current = getTaskStatus(task);
+          const active = current === col.id;
+          return (
+            <button
+              key={col.id}
+              onClick={() => onStatusChange(task.id, col.id)}
+              style={{
+                flex: 1, padding: '4px 0', borderRadius: 6, fontSize: 10, fontFamily: font, cursor: 'pointer',
+                background: active ? `${col.color}22` : C.bg1,
+                border: `1px solid ${active ? col.color : C.b0}`,
+                color: active ? col.color : C.t2, fontWeight: active ? 700 : 400,
+              }}
+            >{col.label}</button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 interface AddTaskFormProps {
   projects: Project[];
   parentLabel?: string;
@@ -210,7 +275,7 @@ function AddTaskForm({ projects, parentLabel, onSubmit, onCancel }: AddTaskFormP
 }
 
 export function TasksView() {
-  const { items, projects, loading, fetch, add, toggle, remove, addProject, removeProject } = useTasksStore();
+  const { items, projects, loading, fetch, add, toggle, setStatus, remove, addProject, removeProject } = useTasksStore();
   const { isMobile } = useWindowSize();
   const [tab, setTab] = useState<TabId>('all');
   const [showForm, setShowForm] = useState(false);
@@ -260,17 +325,18 @@ export function TasksView() {
     setCollapsedProjects((s) => ({ ...s, [id]: !s[id] }));
   };
 
-  const tabBtn = (id: TabId, label: string) => (
+  const tabBtn = (id: TabId, label: string, icon?: React.ReactNode) => (
     <button
       onClick={() => setTab(id)}
       style={{
-        padding: '6px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+        padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
         fontFamily: font, cursor: 'pointer', transition: 'all 0.14s',
         background: tab === id ? C.bg3 : 'transparent',
         border: `1px solid ${tab === id ? C.b1 : 'transparent'}`,
         color: tab === id ? C.t0 : C.t1,
+        display: 'flex', alignItems: 'center', gap: 5,
       }}
-    >{label}</button>
+    >{icon}{label}</button>
   );
 
   return (
@@ -289,9 +355,10 @@ export function TasksView() {
         display: 'flex', gap: 4, marginBottom: 14,
         background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 4, width: 'fit-content',
       }}>
-        {tabBtn('all', '전체')}
-        {tabBtn('projects', `프로젝트 (${projects.length})`)}
-        {tabBtn('done', `완료 (${doneTasks.length})`)}
+        {tabBtn('all', '전체', <LayoutList size={12} />)}
+        {tabBtn('kanban', '칸반', <Columns3 size={12} />)}
+        {tabBtn('projects', `프로젝트`, <Folder size={12} />)}
+        {tabBtn('done', `완료 (${doneTasks.length})`, <CheckCircle2 size={12} />)}
       </div>
 
       {/* All tab */}
@@ -371,6 +438,36 @@ export function TasksView() {
             />
           )}
         </>
+      )}
+
+      {/* Kanban tab */}
+      {tab === 'kanban' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          {STATUS_COLUMNS.map((col) => {
+            const colTasks = items.filter((t) => getTaskStatus(t) === col.id && !t.parentTaskId);
+            return (
+              <div key={col.id} style={{ background: C.bg1, border: `1px solid ${C.b0}`, borderRadius: 12, padding: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: col.color }} />
+                  <span style={{ color: col.color, fontSize: 12, fontWeight: 600 }}>{col.label}</span>
+                  <span style={{ color: C.t2, fontSize: 11, fontFamily: mono, marginLeft: 'auto' }}>{colTasks.length}</span>
+                </div>
+                {colTasks.map((task) => (
+                  <KanbanCard
+                    key={task.id}
+                    task={task}
+                    projects={projects}
+                    onStatusChange={setStatus}
+                    onRemove={remove}
+                  />
+                ))}
+                {colTasks.length === 0 && (
+                  <p style={{ color: C.t2, fontSize: 12, textAlign: 'center', padding: '20px 0' }}>없음</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {/* Projects tab */}
