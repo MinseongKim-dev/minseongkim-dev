@@ -3,11 +3,11 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer,
 } from 'recharts';
 import { ChevronRight, Loader, Zap, Target, Brain, GitBranch, RefreshCw, Plus, Trash2, Award, Layers, MapPin, CheckCircle2, Circle, PauseCircle, Briefcase, BookOpen, GraduationCap, Smile, Frown, Meh } from 'lucide-react';
-import { useCareerStore, type CareerTarget, type CareerPath, type CoachLog, type Skill, type Achievement, type SkillLevel, type CareerGoal, type GoalHorizon, type JobApplication, type JobStage, type GrowthJournal, type Certification, type CertStatus } from '../../shared/stores/career.store';
+import { useCareerStore, type CareerTarget, type CareerPath, type CoachLog, type Skill, type Achievement, type SkillLevel, type CareerGoal, type GoalHorizon, type JobStage, type CertStatus } from '../../shared/stores/career.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
 const C = {
-  bg2: '#0D1228', bg3: '#131B32',
+  bg1: '#090D1F', bg2: '#0D1228', bg3: '#131B32',
   b0: 'rgba(255,255,255,0.04)', b1: 'rgba(255,255,255,0.08)', b2: 'rgba(255,255,255,0.16)',
   t0: '#DDE5F5', t1: '#556070', t2: '#253040',
   blue: '#3B8EF0', violet: '#7C5CF0', teal: '#00CCA0',
