@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Clock, Plus, Trash2, AlertTriangle } from 'lucide-react';
-import { useEventsStore, type CalendarEvent } from '../../shared/stores/events.store';
+import { Clock, Plus, Trash2, AlertTriangle, Repeat } from 'lucide-react';
+import { useEventsStore, type CalendarEvent, type RecurrenceType } from '../../shared/stores/events.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
 const C = {
   bg1: '#090D1F', bg2: '#0D1228',
   b0: 'rgba(255,255,255,0.04)', b1: 'rgba(255,255,255,0.08)',
   t0: '#DDE5F5', t1: '#556070', t2: '#253040',
-  blue: '#3B8EF0', violet: '#7C5CF0', teal: '#00CCA0', amber: '#EFA020', sky: '#58AEFF',
+  blue: '#3B8EF0', violet: '#7C5CF0', teal: '#00CCA0', amber: '#EFA020', sky: '#58AEFF', rose: '#F05472',
 };
 const font = '"Space Grotesk", system-ui, sans-serif';
 const mono = '"JetBrains Mono", "Fira Code", monospace';
@@ -61,7 +61,7 @@ function detectConflicts(events: CalendarEvent[]): Set<string> {
 }
 
 export function ScheduleView() {
-  const { items, loading, fetch, add, remove } = useEventsStore();
+  const { items, loading, fetch, add, addRecurring, remove, removeGroup } = useEventsStore();
   const { isMobile } = useWindowSize();
   const todayStr = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState(todayStr);
@@ -70,6 +70,9 @@ export function ScheduleView() {
   const [date, setDate] = useState(todayStr);
   const [time, setTime] = useState('');
   const [category, setCategory] = useState('work');
+  const [recurrence, setRecurrence] = useState<RecurrenceType>('none');
+  const [recurrenceCount, setRecurrenceCount] = useState(8);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; groupId?: string } | null>(null);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -87,9 +90,22 @@ export function ScheduleView() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    await add({ title: title.trim(), date, time: time || undefined, category });
-    setTitle(''); setTime('');
+    const base = { title: title.trim(), date, time: time || undefined, category };
+    if (recurrence !== 'none') {
+      await addRecurring(base, recurrence, recurrenceCount);
+    } else {
+      await add(base);
+    }
+    setTitle(''); setTime(''); setRecurrence('none');
     if (isMobile) setShowForm(false);
+  };
+
+  const handleDelete = (ev: CalendarEvent) => {
+    if (ev.recurrenceGroupId) {
+      setDeleteConfirm({ id: ev.id, groupId: ev.recurrenceGroupId });
+    } else {
+      void remove(ev.id);
+    }
   };
 
   const AddForm = (
@@ -119,8 +135,28 @@ export function ScheduleView() {
         ))}
       </select>
       <div style={{ display: 'flex', gap: 8 }}>
+        <select
+          value={recurrence} onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
+          style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, cursor: 'pointer' }}
+        >
+          <option value="none">반복 없음</option>
+          <option value="weekly">매주 반복</option>
+          <option value="monthly">매월 반복</option>
+        </select>
+        {recurrence !== 'none' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="number" min={2} max={52} value={recurrenceCount}
+              onChange={(e) => setRecurrenceCount(Number(e.target.value))}
+              style={{ width: 52, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 8px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none' }}
+            />
+            <span style={{ color: C.t1, fontSize: 12 }}>{recurrence === 'weekly' ? '주' : '개월'}</span>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
         <button type="submit" style={{ flex: 1, padding: '9px', background: C.blue, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer' }}>
-          추가
+          {recurrence !== 'none' ? `${recurrenceCount}회 추가` : '추가'}
         </button>
         {isMobile && (
           <button type="button" onClick={() => setShowForm(false)} style={{ padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>
@@ -211,6 +247,11 @@ export function ScheduleView() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <p style={{ color: C.t0, fontSize: 13.5 }}>{ev.title}</p>
                         {isConflict && <AlertTriangle size={11} color={C.amber} />}
+                        {ev.recurrenceGroupId && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: C.violet, background: `${C.violet}18`, borderRadius: 4, padding: '1px 6px' }}>
+                            <Repeat size={9} />반복
+                          </span>
+                        )}
                       </div>
                       {ev.time && (
                         <p style={{ color: C.t1, fontSize: 11.5, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -221,7 +262,7 @@ export function ScheduleView() {
                     <span style={{ fontSize: 10, fontWeight: 600, color: col, background: `${col}18`, borderRadius: 5, padding: '2px 8px' }}>
                       {CATEGORY_LABEL[ev.category ?? 'other'] ?? ev.category}
                     </span>
-                    <button onClick={() => remove(ev.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex' }}>
+                    <button onClick={() => handleDelete(ev)} style={{ color: C.t2, cursor: 'pointer', display: 'flex' }}>
                       <Trash2 size={13} />
                     </button>
                   </div>
@@ -243,6 +284,61 @@ export function ScheduleView() {
           )
         )}
       </div>
+
+      {/* ── Delete confirmation modal ── */}
+      {deleteConfirm && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(6,9,26,0.75)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => setDeleteConfirm(null)}
+        >
+          <div
+            style={{
+              background: '#0D1228', border: `1px solid rgba(255,255,255,0.12)`,
+              borderRadius: 16, padding: '24px', width: 320, boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p style={{ color: C.t0, fontSize: 15, fontWeight: 600, marginBottom: 8 }}>반복 일정 삭제</p>
+            <p style={{ color: C.t1, fontSize: 13, marginBottom: 20 }}>이 일정은 반복 일정입니다. 어떻게 삭제할까요?</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => { void remove(deleteConfirm.id); setDeleteConfirm(null); }}
+                style={{
+                  padding: '10px 16px', borderRadius: 10, cursor: 'pointer', fontFamily: font,
+                  background: `${C.blue}18`, border: `1px solid ${C.blue}50`,
+                  color: C.blue, fontSize: 13, textAlign: 'left',
+                }}
+              >
+                이 일정만 삭제
+              </button>
+              <button
+                onClick={() => { void removeGroup(deleteConfirm.groupId!); setDeleteConfirm(null); }}
+                style={{
+                  padding: '10px 16px', borderRadius: 10, cursor: 'pointer', fontFamily: font,
+                  background: `${C.rose}18`, border: `1px solid ${C.rose}50`,
+                  color: C.rose, fontSize: 13, textAlign: 'left',
+                }}
+              >
+                모든 반복 일정 삭제
+              </button>
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                style={{
+                  padding: '10px 16px', borderRadius: 10, cursor: 'pointer', fontFamily: font,
+                  background: 'transparent', border: `1px solid rgba(255,255,255,0.08)`,
+                  color: C.t1, fontSize: 13,
+                }}
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Right panel: week strip + add form (desktop only) ── */}
       {!isMobile && (
