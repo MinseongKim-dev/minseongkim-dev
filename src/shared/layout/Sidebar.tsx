@@ -1,10 +1,11 @@
 import {
   Home, Calendar, CheckSquare, DollarSign, Activity,
-  BookOpen, Briefcase, Users, MessageCircle, Settings, X,
+  BookOpen, Briefcase, Users, MessageCircle, Settings, LogOut, X,
 } from 'lucide-react';
 import { useAppStore, type ViewId } from '../stores/app.store';
 import { useTasksStore } from '../stores/tasks.store';
 import { useWindowSize } from '../hooks/useWindowSize';
+import { useAuth } from '../../contexts/useAuth';
 
 const C = {
   bg1: '#090D1F', bg2: '#0D1228', bg3: '#131B32',
@@ -33,6 +34,7 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean; onClose
   const { view, setView, chatOpen, toggleChat } = useAppStore();
   const { items: tasks } = useTasksStore();
   const { isMobile } = useWindowSize();
+  const { logout } = useAuth();
 
   const urgentCount = tasks.filter((t) => !t.done && (t.priority === 'urgent' || t.priority === 'high')).length;
 
@@ -150,6 +152,14 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean; onClose
           }}>
             <Settings size={14} color={C.t1} />
             설정
+          </button>
+          <button onClick={logout} style={{
+            display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px',
+            borderRadius: 8, color: C.t1, fontSize: 13.5, fontFamily: font,
+            width: '100%', textAlign: 'left',
+          }}>
+            <LogOut size={14} color={C.t1} />
+            로그아웃
           </button>
         </div>
       </div>
