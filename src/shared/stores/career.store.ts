@@ -120,6 +120,24 @@ export interface Certification {
   linkedLearningGoalId?: string;
 }
 
+export interface WorkLog {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  breakMinutes: number;
+  notes?: string;
+}
+
+export interface SalaryRecord {
+  id: string;
+  year: number;
+  company: string;
+  baseSalary: number;
+  incentive: number;
+  notes?: string;
+}
+
 interface CareerStore {
   target: CareerTarget | null;
   paths: CareerPath[];
@@ -130,6 +148,8 @@ interface CareerStore {
   jobApplications: JobApplication[];
   growthJournals: GrowthJournal[];
   certifications: Certification[];
+  workLogs: WorkLog[];
+  salaryRecords: SalaryRecord[];
   loading: boolean;
   aiLoading: boolean;
   fetch: () => Promise<void>;
@@ -153,6 +173,11 @@ interface CareerStore {
   addCertification: (data: Omit<Certification, 'id'>) => Promise<void>;
   updateCertification: (id: string, data: Partial<Certification>) => Promise<void>;
   removeCertification: (id: string) => Promise<void>;
+  addWorkLog: (data: Omit<WorkLog, 'id'>) => Promise<void>;
+  removeWorkLog: (id: string) => Promise<void>;
+  addSalaryRecord: (data: Omit<SalaryRecord, 'id'>) => Promise<void>;
+  updateSalaryRecord: (id: string, data: Partial<SalaryRecord>) => Promise<void>;
+  removeSalaryRecord: (id: string) => Promise<void>;
 }
 
 export const useCareerStore = create<CareerStore>((set, get) => ({
@@ -165,13 +190,15 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
   jobApplications: [],
   growthJournals: [],
   certifications: [],
+  workLogs: [],
+  salaryRecords: [],
   loading: false,
   aiLoading: false,
 
   fetch: async () => {
     set({ loading: true });
     try {
-      const [targets, skills, achievements, careerGoals, jobApplications, growthJournals, certifications] = await Promise.all([
+      const [targets, skills, achievements, careerGoals, jobApplications, growthJournals, certifications, workLogs, salaryRecords] = await Promise.all([
         api.get<CareerTarget[]>('/targets'),
         api.get<Skill[]>('/skills').catch(() => []),
         api.get<Achievement[]>('/achievements').catch(() => []),
@@ -179,6 +206,8 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
         api.get<JobApplication[]>('/job-apps').catch(() => []),
         api.get<GrowthJournal[]>('/journals').catch(() => []),
         api.get<Certification[]>('/certs').catch(() => []),
+        api.get<WorkLog[]>('/work-logs').catch(() => []),
+        api.get<SalaryRecord[]>('/salary').catch(() => []),
       ]);
       const active = (targets ?? []).find((t) => t.status !== 'completed') ?? (targets ?? [])[0] ?? null;
       set({
@@ -189,6 +218,8 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
         jobApplications: jobApplications ?? [],
         growthJournals: growthJournals ?? [],
         certifications: certifications ?? [],
+        workLogs: workLogs ?? [],
+        salaryRecords: (salaryRecords ?? []).sort((a, b) => a.year - b.year),
       });
       if (active) {
         const [paths, logs] = await Promise.all([
@@ -409,6 +440,47 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
   removeCertification: async (id) => {
     set((s) => ({ certifications: s.certifications.filter((c) => c.id !== id) }));
     await api.delete<unknown>(`/certs/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
+  },
+
+  addWorkLog: async (data) => {
+    try {
+      const item = await api.post<WorkLog>('/work-logs', data);
+      set((s) => ({ workLogs: [item, ...s.workLogs] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '근무 기록 추가에 실패했습니다');
+      throw err;
+    }
+  },
+
+  removeWorkLog: async (id) => {
+    set((s) => ({ workLogs: s.workLogs.filter((w) => w.id !== id) }));
+    await api.delete<unknown>(`/work-logs/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
+  },
+
+  addSalaryRecord: async (data) => {
+    try {
+      const item = await api.post<SalaryRecord>('/salary', data);
+      set((s) => ({ salaryRecords: [...s.salaryRecords, item].sort((a, b) => a.year - b.year) }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '연봉 기록 추가에 실패했습니다');
+      throw err;
+    }
+  },
+
+  updateSalaryRecord: async (id, data) => {
+    set((s) => ({ salaryRecords: s.salaryRecords.map((r) => (r.id === id ? { ...r, ...data } : r)) }));
+    await api.put<SalaryRecord>(`/salary/${id}`, data).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '업데이트에 실패했습니다');
+    });
+  },
+
+  removeSalaryRecord: async (id) => {
+    set((s) => ({ salaryRecords: s.salaryRecords.filter((r) => r.id !== id) }));
+    await api.delete<unknown>(`/salary/${id}`).catch((err) => {
       useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
     });
   },

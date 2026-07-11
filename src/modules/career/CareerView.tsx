@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts';
-import { ChevronRight, Loader, Zap, Target, Brain, GitBranch, RefreshCw, Plus, Trash2, Award, Layers, MapPin, CheckCircle2, Circle, PauseCircle, Briefcase, BookOpen, GraduationCap, Smile, Frown, Meh } from 'lucide-react';
+import { ChevronRight, Loader, Zap, Target, Brain, GitBranch, RefreshCw, Plus, Trash2, Award, Layers, MapPin, CheckCircle2, Circle, PauseCircle, Briefcase, BookOpen, GraduationCap, Smile, Frown, Meh, Clock, TrendingUp, DollarSign, AlertTriangle } from 'lucide-react';
 import { useCareerStore, type CareerTarget, type CareerPath, type CoachLog, type Skill, type Achievement, type SkillLevel, type CareerGoal, type GoalHorizon, type JobStage, type CertStatus } from '../../shared/stores/career.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
@@ -1215,11 +1216,329 @@ function CertsTab() {
 }
 
 // ---------------------------------------------------------------------------
+// CAR-07: WorklifeTab — 워라밸 탭
+// ---------------------------------------------------------------------------
+function WorklifeTab() {
+  const { workLogs, addWorkLog, removeWorkLog } = useCareerStore();
+  const { isMobile } = useWindowSize();
+  const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], startTime: '09:00', endTime: '18:00', breakMinutes: 60, notes: '' });
+  const [saving, setSaving] = useState(false);
+
+  const calcHours = (start: string, end: string, brk: number) => {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    return Math.max(0, (eh * 60 + em - sh * 60 - sm - brk) / 60);
+  };
+
+  const getWeekKey = (date: string) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const mon = new Date(d.setDate(diff));
+    return mon.toISOString().split('T')[0];
+  };
+
+  const weeklyData = (() => {
+    const map: Record<string, number> = {};
+    workLogs.forEach((w) => {
+      const wk = getWeekKey(w.date);
+      map[wk] = (map[wk] ?? 0) + calcHours(w.startTime, w.endTime, w.breakMinutes);
+    });
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-8)
+      .map(([week, hours]) => ({
+        label: `${week.slice(5, 7)}/${week.slice(8, 10)}주`,
+        regular: Math.min(hours, 40),
+        overtime: Math.max(0, Math.min(hours, 52) - 40),
+        excess: Math.max(0, hours - 52),
+        total: hours,
+      }));
+  })();
+
+  const thisWeek = weeklyData[weeklyData.length - 1]?.total ?? 0;
+  const burnout = Math.min(100, Math.round((thisWeek / 52) * 100));
+  const burnoutColor = thisWeek >= 52 ? C.rose : thisWeek >= 40 ? C.amber : C.teal;
+
+  const monthlyAvg = (() => {
+    if (!workLogs.length) return 0;
+    const now = new Date();
+    const month = now.toISOString().slice(0, 7);
+    const monthLogs = workLogs.filter((w) => w.date.startsWith(month));
+    if (!monthLogs.length) return 0;
+    const totalH = monthLogs.reduce((s, w) => s + calcHours(w.startTime, w.endTime, w.breakMinutes), 0);
+    const weeks = Math.ceil(monthLogs.length / 5);
+    return +(totalH / Math.max(1, weeks)).toFixed(1);
+  })();
+
+  const inp: React.CSSProperties = { background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 7, padding: '8px 10px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none', width: '100%', boxSizing: 'border-box' };
+
+  const handleAdd = async () => {
+    setSaving(true);
+    try { await addWorkLog({ ...form }); setForm((f) => ({ ...f, notes: '' })); } finally { setSaving(false); }
+  };
+
+  const LogForm = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div><label style={{ color: C.t1, fontSize: 11, display: 'block', marginBottom: 5 }}>날짜</label><input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} style={inp} /></div>
+        <div><label style={{ color: C.t1, fontSize: 11, display: 'block', marginBottom: 5 }}>휴게(분)</label><input type="number" value={form.breakMinutes} onChange={(e) => setForm((f) => ({ ...f, breakMinutes: Number(e.target.value) }))} style={inp} /></div>
+        <div><label style={{ color: C.t1, fontSize: 11, display: 'block', marginBottom: 5 }}>출근</label><input type="time" value={form.startTime} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} style={inp} /></div>
+        <div><label style={{ color: C.t1, fontSize: 11, display: 'block', marginBottom: 5 }}>퇴근</label><input type="time" value={form.endTime} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} style={inp} /></div>
+      </div>
+      <div><label style={{ color: C.t1, fontSize: 11, display: 'block', marginBottom: 5 }}>메모</label><input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="오늘 작업 요약 (선택)" style={inp} /></div>
+      <button onClick={() => void handleAdd()} disabled={saving} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', borderRadius: 8, background: `${C.teal}20`, border: `1px solid ${C.teal}50`, color: C.teal, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>
+        <Plus size={14} />{saving ? '저장 중…' : '기록 추가'}
+      </button>
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Burnout gauge + stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          {[
+            { label: '이번 주', value: `${thisWeek.toFixed(1)}h`, color: burnoutColor, sub: thisWeek >= 52 ? '⚠ 52h 초과' : `${(52 - thisWeek).toFixed(1)}h 여유` },
+            { label: '번아웃 지수', value: `${burnout}%`, color: burnoutColor, sub: burnout >= 100 ? '경고' : burnout >= 77 ? '주의' : '양호' },
+            { label: '이번 달 주평균', value: `${monthlyAvg}h`, color: C.sky, sub: '주간 평균' },
+          ].map((s) => (
+            <div key={s.label} style={{ background: C.bg2, border: `1px solid ${s.color}30`, borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ color: C.t1, fontSize: 11, marginBottom: 6 }}>{s.label}</div>
+              <div style={{ color: s.color, fontSize: 22, fontWeight: 700, fontFamily: mono }}>{s.value}</div>
+              <div style={{ color: C.t1, fontSize: 11, marginTop: 4 }}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Weekly trend chart */}
+        {weeklyData.length > 0 && (
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <TrendingUp size={14} color={C.teal} />
+              <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>주간 근무 트렌드</span>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 12 }}>
+                {[{ color: C.teal, label: '정규' }, { color: C.amber, label: '연장' }, { color: C.rose, label: '초과' }].map((l) => (
+                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: l.color }} />
+                    <span style={{ color: C.t1, fontSize: 10 }}>{l.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={weeklyData} barSize={14} barGap={1}>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.b0} vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: C.t1, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: C.t1, fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 60]} unit="h" width={32} />
+                <Tooltip contentStyle={{ background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8, fontFamily: font, fontSize: 12 }} labelStyle={{ color: C.t0 }} itemStyle={{ color: C.t1 }} formatter={(v) => typeof v === 'number' ? `${v.toFixed(1)}h` : String(v)} />
+                <Bar dataKey="regular" stackId="a" fill={C.teal} radius={[0, 0, 0, 0]} />
+                <Bar dataKey="overtime" stackId="a" fill={C.amber} />
+                <Bar dataKey="excess" stackId="a" fill={C.rose} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Log list */}
+        <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.b0}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Clock size={13} color={C.teal} />
+            <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>근무 기록</span>
+            <span style={{ marginLeft: 'auto', color: C.t1, fontSize: 11, fontFamily: mono }}>{workLogs.length}건</span>
+          </div>
+          {workLogs.length === 0 && <div style={{ padding: '24px 16px', color: C.t1, fontSize: 13, textAlign: 'center' }}>기록이 없습니다</div>}
+          {workLogs.slice(0, 20).map((w) => {
+            const h = calcHours(w.startTime, w.endTime, w.breakMinutes);
+            const over = h > 52 / 5;
+            return (
+              <div key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderTop: `1px solid ${C.b0}` }}>
+                {over && <AlertTriangle size={12} color={C.rose} style={{ flexShrink: 0 }} />}
+                {!over && <Clock size={12} color={C.t1} style={{ flexShrink: 0 }} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: C.t0, fontSize: 13 }}>{w.date} <span style={{ color: C.t1, fontSize: 11 }}>{w.startTime}–{w.endTime}</span></div>
+                  {w.notes && <div style={{ color: C.t1, fontSize: 11, marginTop: 2 }}>{w.notes}</div>}
+                </div>
+                <span style={{ color: over ? C.rose : C.teal, fontSize: 13, fontWeight: 600, fontFamily: mono, flexShrink: 0 }}>{h.toFixed(1)}h</span>
+                <button onClick={() => void removeWorkLog(w.id)} style={{ color: C.t1, cursor: 'pointer', display: 'flex', flexShrink: 0 }}><Trash2 size={13} /></button>
+              </div>
+            );
+          })}
+        </div>
+
+        {isMobile && LogForm}
+      </div>
+
+      {!isMobile && (
+        <div style={{ width: 272, flexShrink: 0 }}>
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>근무 기록 추가</p>
+            {LogForm}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CAR-06: SalaryTab — 급여 트래커
+// ---------------------------------------------------------------------------
+function SalaryTab() {
+  const { salaryRecords, addSalaryRecord, removeSalaryRecord } = useCareerStore();
+  const { isMobile } = useWindowSize();
+  const [form, setForm] = useState({ year: new Date().getFullYear(), company: '', baseSalary: 0, incentive: 0, notes: '' });
+  const [deductInsurance, setDeductInsurance] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const INSURANCE_RATE = 0.094;
+  const netPackage = (base: number, inc: number) => {
+    const gross = base + inc;
+    return deductInsurance ? gross * (1 - INSURANCE_RATE) : gross;
+  };
+
+  const chartData = salaryRecords.map((r, i) => ({
+    year: String(r.year),
+    연봉: r.baseSalary,
+    인센티브: r.incentive,
+    yoy: i > 0 ? +(((r.baseSalary - salaryRecords[i - 1].baseSalary) / salaryRecords[i - 1].baseSalary) * 100).toFixed(1) : null,
+  }));
+
+  const inp: React.CSSProperties = { background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 7, padding: '8px 10px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none', width: '100%', boxSizing: 'border-box' };
+
+  const handleAdd = async () => {
+    if (!form.company || !form.baseSalary) return;
+    setSaving(true);
+    try { await addSalaryRecord({ ...form }); setForm((f) => ({ ...f, company: '', baseSalary: 0, incentive: 0, notes: '' })); } finally { setSaving(false); }
+  };
+
+  const SalaryForm = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div><label style={{ color: C.t1, fontSize: 11, display: 'block', marginBottom: 5 }}>연도</label><input type="number" value={form.year} onChange={(e) => setForm((f) => ({ ...f, year: Number(e.target.value) }))} style={inp} /></div>
+        <div><label style={{ color: C.t1, fontSize: 11, display: 'block', marginBottom: 5 }}>회사명</label><input value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))} placeholder="회사명" style={inp} /></div>
+        <div><label style={{ color: C.t1, fontSize: 11, display: 'block', marginBottom: 5 }}>기본급 (만원)</label><input type="number" value={form.baseSalary || ''} onChange={(e) => setForm((f) => ({ ...f, baseSalary: Number(e.target.value) }))} style={inp} /></div>
+        <div><label style={{ color: C.t1, fontSize: 11, display: 'block', marginBottom: 5 }}>인센티브 (만원)</label><input type="number" value={form.incentive || ''} onChange={(e) => setForm((f) => ({ ...f, incentive: Number(e.target.value) }))} style={inp} /></div>
+      </div>
+      <div><label style={{ color: C.t1, fontSize: 11, display: 'block', marginBottom: 5 }}>메모 (시장 비교)</label><input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="시장 평균 대비, 복리후생 등" style={inp} /></div>
+      <button onClick={() => void handleAdd()} disabled={saving || !form.company || !form.baseSalary} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', borderRadius: 8, background: form.company && form.baseSalary ? `${C.amber}20` : C.bg3, border: `1px solid ${form.company && form.baseSalary ? `${C.amber}50` : C.b1}`, color: form.company && form.baseSalary ? C.amber : C.t1, fontSize: 13, fontFamily: font, cursor: form.company && form.baseSalary ? 'pointer' : 'default' }}>
+        <Plus size={14} />{saving ? '저장 중…' : '기록 추가'}
+      </button>
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Summary cards */}
+        {salaryRecords.length > 0 && (() => {
+          const latest = salaryRecords[salaryRecords.length - 1];
+          const prev = salaryRecords.length > 1 ? salaryRecords[salaryRecords.length - 2] : null;
+          const growth = prev ? +(((latest.baseSalary - prev.baseSalary) / prev.baseSalary) * 100).toFixed(1) : null;
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              {[
+                { label: '현재 기본급', value: `${latest.baseSalary.toLocaleString()}만`, color: C.amber },
+                { label: 'YoY 성장률', value: growth != null ? `${growth > 0 ? '+' : ''}${growth}%` : '—', color: growth != null && growth > 0 ? C.teal : C.rose },
+                { label: `연간 패키지${deductInsurance ? ' (세후)' : ''}`, value: `${Math.round(netPackage(latest.baseSalary, latest.incentive)).toLocaleString()}만`, color: C.sky },
+              ].map((s) => (
+                <div key={s.label} style={{ background: C.bg2, border: `1px solid ${s.color}30`, borderRadius: 12, padding: '14px 16px' }}>
+                  <div style={{ color: C.t1, fontSize: 11, marginBottom: 6 }}>{s.label}</div>
+                  <div style={{ color: s.color, fontSize: 22, fontWeight: 700, fontFamily: mono }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* Chart */}
+        {chartData.length > 0 && (
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <TrendingUp size={14} color={C.amber} />
+              <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>연봉 성장 추이</span>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 12 }}>
+                {[{ color: C.amber, label: '기본급' }, { color: C.sky, label: '인센티브' }].map((l) => (
+                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: l.color }} />
+                    <span style={{ color: C.t1, fontSize: 10 }}>{l.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={chartData} barSize={18} barGap={2}>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.b0} vertical={false} />
+                <XAxis dataKey="year" tick={{ fill: C.t1, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: C.t1, fontSize: 10 }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `${(v / 1000).toFixed(0)}천`} />
+                <Tooltip contentStyle={{ background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8, fontFamily: font, fontSize: 12 }} labelStyle={{ color: C.t0 }} itemStyle={{ color: C.t1 }} formatter={(v) => typeof v === 'number' ? `${v.toLocaleString()}만원` : String(v)} />
+                <Bar dataKey="연봉" fill={C.amber} radius={[0, 0, 0, 0]} />
+                <Bar dataKey="인센티브" fill={C.sky} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Salary list */}
+        <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.b0}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DollarSign size={13} color={C.amber} />
+            <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>연봉 이력</span>
+            <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={deductInsurance} onChange={(e) => setDeductInsurance(e.target.checked)} />
+              <span style={{ color: C.t1, fontSize: 11 }}>4대보험 공제</span>
+            </label>
+          </div>
+          {salaryRecords.length === 0 && <div style={{ padding: '24px 16px', color: C.t1, fontSize: 13, textAlign: 'center' }}>기록이 없습니다</div>}
+          {[...salaryRecords].reverse().map((r, i, arr) => {
+            const prev = arr[i + 1];
+            const growth = prev ? +(((r.baseSalary - prev.baseSalary) / prev.baseSalary) * 100).toFixed(1) : null;
+            return (
+              <div key={r.id} style={{ padding: '12px 16px', borderTop: `1px solid ${C.b0}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>{r.year}년</span>
+                      <span style={{ color: C.t1, fontSize: 12 }}>{r.company}</span>
+                      {growth != null && (
+                        <span style={{ color: growth > 0 ? C.teal : C.rose, fontSize: 11, fontFamily: mono }}>{growth > 0 ? '+' : ''}{growth}%</span>
+                      )}
+                    </div>
+                    {r.notes && <div style={{ color: C.t1, fontSize: 11, marginTop: 3 }}>{r.notes}</div>}
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ color: C.amber, fontSize: 14, fontWeight: 700, fontFamily: mono }}>{r.baseSalary.toLocaleString()}만</div>
+                    {r.incentive > 0 && <div style={{ color: C.t1, fontSize: 11 }}>+인센 {r.incentive.toLocaleString()}만</div>}
+                    {deductInsurance && <div style={{ color: C.sky, fontSize: 11 }}>실수령 ≈{Math.round(netPackage(r.baseSalary, r.incentive)).toLocaleString()}만</div>}
+                  </div>
+                  <button onClick={() => void removeSalaryRecord(r.id)} style={{ color: C.t1, cursor: 'pointer', display: 'flex', flexShrink: 0 }}><Trash2 size={13} /></button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {isMobile && SalaryForm}
+      </div>
+
+      {!isMobile && (
+        <div style={{ width: 272, flexShrink: 0 }}>
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>연봉 기록 추가</p>
+            {SalaryForm}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 export function CareerView() {
   const { fetch } = useCareerStore();
-  const [tab, setTab] = useState<'coach' | 'roadmap' | 'skills' | 'achievements' | 'pipeline' | 'journal' | 'certs'>('coach');
+  const [tab, setTab] = useState<'coach' | 'roadmap' | 'skills' | 'achievements' | 'pipeline' | 'journal' | 'certs' | 'worklife' | 'salary'>('coach');
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -1231,6 +1550,8 @@ export function CareerView() {
     { id: 'pipeline' as const, label: '파이프라인', icon: Briefcase, color: C.amber },
     { id: 'journal' as const, label: '성장저널', icon: BookOpen, color: C.violet },
     { id: 'certs' as const, label: '자격증', icon: GraduationCap, color: C.teal },
+    { id: 'worklife' as const, label: '워라밸', icon: Clock, color: C.teal },
+    { id: 'salary' as const, label: '급여', icon: DollarSign, color: C.amber },
   ];
 
   return (
@@ -1265,6 +1586,8 @@ export function CareerView() {
       {tab === 'pipeline' && <PipelineTab />}
       {tab === 'journal' && <JournalTab />}
       {tab === 'certs' && <CertsTab />}
+      {tab === 'worklife' && <WorklifeTab />}
+      {tab === 'salary' && <SalaryTab />}
     </div>
   );
 }
