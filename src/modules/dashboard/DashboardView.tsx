@@ -135,7 +135,7 @@ export function DashboardView() {
   // Health
   const lastWorkout = [...workouts].sort((a, b) => b.date.localeCompare(a.date))[0];
   const daysSinceWorkout = lastWorkout
-    ? Math.floor((Date.now() - new Date(lastWorkout.date + 'T12:00:00').getTime()) / 86400000)
+    ? Math.floor((today.getTime() - new Date(lastWorkout.date + 'T12:00:00').getTime()) / 86400000)
     : Infinity;
   const weekMon = new Date(today);
   weekMon.setDate(today.getDate() - ((today.getDay() + 6) % 7));
@@ -150,7 +150,7 @@ export function DashboardView() {
   const overdueContacts = contacts.filter((c) => {
     if (!c.lastContact) return contacts.length > 0;
     return Math.floor(
-      (Date.now() - new Date(c.lastContact + 'T12:00:00').getTime()) / 86400000,
+      (today.getTime() - new Date(c.lastContact + 'T12:00:00').getTime()) / 86400000,
     ) > 30;
   });
 
