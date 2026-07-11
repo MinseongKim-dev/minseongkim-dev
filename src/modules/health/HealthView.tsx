@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Flame, Clock, Activity, Moon, BarChart2, Star } from 'lucide-react';
+import { Plus, Trash2, Flame, Clock, Activity, Moon, BarChart2, Star, Droplets, Footprints, Scale } from 'lucide-react';
 import { useHealthStore, type SleepLog } from '../../shared/stores/health.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 
 const C = {
   bg0: '#06091A', bg1: '#090D1F', bg2: '#0D1228', bg3: '#131B32',
@@ -231,9 +232,9 @@ function DashboardTab() {
 
 // ─── Main View ────────────────────────────────────────────────────────────────
 export function HealthView() {
-  const { items, sleepLogs, loading, add, remove, addSleepLog, removeSleepLog, fetch } = useHealthStore();
+  const { items, sleepLogs, weightLogs, waterLogs, stepsLogs, loading, add, remove, addSleepLog, removeSleepLog, addWeightLog, removeWeightLog, addWaterLog, addStepsLog, fetch } = useHealthStore();
   const { isMobile } = useWindowSize();
-  const [tab, setTab] = useState<'workout' | 'sleep' | 'dashboard'>('dashboard');
+  const [tab, setTab] = useState<'workout' | 'sleep' | 'dashboard' | 'body'>('dashboard');
 
   // Workout form
   const [showWorkoutForm, setShowWorkoutForm] = useState(false);
@@ -362,10 +363,25 @@ export function HealthView() {
     </form>
   );
 
+  // ── Body metrics state ──────────────────────────────────────────────────────
+  const [heightCm, setHeightCm] = useState(170);
+  const [weightInput, setWeightInput] = useState('');
+  const [weightDate, setWeightDate] = useState(new Date().toISOString().split('T')[0]);
+  const [waterAmount, setWaterAmount] = useState(250);
+  const [stepsInput, setStepsInput] = useState('');
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayWater = waterLogs.filter((w) => w.date === todayStr).reduce((s, w) => s + w.amount, 0);
+  const todaySteps = stepsLogs.find((s) => s.date === todayStr)?.steps ?? 0;
+  const latestWeight = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].weight : null;
+  const bmi = latestWeight ? +(latestWeight / ((heightCm / 100) ** 2)).toFixed(1) : null;
+  const bmiLabel = bmi == null ? '' : bmi < 18.5 ? '저체중' : bmi < 23 ? '정상' : bmi < 25 ? '과체중' : '비만';
+  const bmiColor = bmi == null ? C.t1 : bmi < 18.5 ? C.sky : bmi < 23 ? C.teal : bmi < 25 ? C.amber : C.rose;
+  const weightChartData = weightLogs.slice(-14).map((w) => ({ date: w.date.slice(5), kg: w.weight }));
   const tabs = [
     { id: 'dashboard' as const, label: '대시보드', icon: BarChart2, color: C.blue },
     { id: 'workout' as const, label: '운동', icon: Activity, color: C.teal },
     { id: 'sleep' as const, label: '수면', icon: Moon, color: C.violet },
+    { id: 'body' as const, label: '신체', icon: Scale, color: C.sky },
   ];
 
   return (
@@ -498,6 +514,111 @@ export function HealthView() {
             )}
           </>
         )}
+        {tab === 'body' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Summary row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              {[
+                { label: '현재 체중', value: latestWeight ? `${latestWeight}kg` : '—', sub: bmi ? `BMI ${bmi} ${bmiLabel}` : '기록 없음', color: bmiColor, Icon: Scale },
+                { label: '오늘 수분', value: `${(todayWater / 1000).toFixed(1)}L`, sub: `목표 2L 대비 ${Math.min(100, Math.round(todayWater / 20))}%`, color: C.sky, Icon: Droplets },
+                { label: '오늘 걸음', value: todaySteps.toLocaleString(), sub: `목표 10,000보 대비 ${Math.min(100, Math.round(todaySteps / 100))}%`, color: C.teal, Icon: Footprints },
+              ].map((s) => (
+                <div key={s.label} style={{ background: C.bg2, border: `1px solid ${s.color}30`, borderRadius: 12, padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}><s.Icon size={12} color={s.color} /><span style={{ color: C.t1, fontSize: 11 }}>{s.label}</span></div>
+                  <div style={{ color: s.color, fontSize: 22, fontWeight: 700, fontFamily: mono }}>{s.value}</div>
+                  <div style={{ color: C.t1, fontSize: 11, marginTop: 4 }}>{s.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Weight chart */}
+            {weightChartData.length > 1 && (
+              <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                  <Scale size={13} color={C.sky} />
+                  <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>체중 변화 (최근 14일)</span>
+                </div>
+                <ResponsiveContainer width="100%" height={160}>
+                  <AreaChart data={weightChartData}>
+                    <defs>
+                      <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={C.sky} stopOpacity={0.35} />
+                        <stop offset="100%" stopColor={C.sky} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={C.b0} vertical={false} />
+                    <XAxis dataKey="date" tick={{ fill: C.t1, fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: C.t1, fontSize: 10 }} axisLine={false} tickLine={false} width={36} domain={['auto', 'auto']} unit="kg" />
+                    <Tooltip contentStyle={{ background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8, fontFamily: font, fontSize: 12 }} formatter={(v) => [`${v}kg`, '체중']} />
+                    <Area type="monotone" dataKey="kg" stroke={C.sky} strokeWidth={2} fill="url(#wg)" dot={{ r: 3, fill: C.sky }} activeDot={{ r: 5 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Water today log */}
+            <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Droplets size={13} color={C.sky} />
+                <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>오늘 수분 섭취</span>
+                <span style={{ marginLeft: 'auto', color: C.sky, fontSize: 13, fontWeight: 700, fontFamily: mono }}>{todayWater}ml / 2000ml</span>
+              </div>
+              <div style={{ background: C.bg3, borderRadius: 6, height: 8, marginBottom: 14, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.min(100, todayWater / 20)}%`, background: `linear-gradient(90deg,${C.sky},${C.teal})`, borderRadius: 6, transition: 'width 0.4s' }} />
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[150, 250, 350, 500].map((ml) => (
+                  <button key={ml} onClick={() => void addWaterLog({ date: todayStr, amount: ml })} style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12, fontFamily: font, background: `${C.sky}15`, border: `1px solid ${C.sky}40`, color: C.sky, cursor: 'pointer' }}>+{ml}ml</button>
+                ))}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input type="number" value={waterAmount} onChange={(e) => setWaterAmount(Number(e.target.value))} style={{ width: 64, background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 6, padding: '5px 8px', color: C.t0, fontSize: 12, fontFamily: font, outline: 'none' }} />
+                  <button onClick={() => void addWaterLog({ date: todayStr, amount: waterAmount })} style={{ padding: '6px 10px', borderRadius: 20, fontSize: 12, fontFamily: font, background: `${C.sky}15`, border: `1px solid ${C.sky}40`, color: C.sky, cursor: 'pointer' }}>추가</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Steps today */}
+            <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Footprints size={13} color={C.teal} />
+                <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>오늘 걸음 수</span>
+              </div>
+              <div style={{ background: C.bg3, borderRadius: 6, height: 8, marginBottom: 14, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.min(100, todaySteps / 100)}%`, background: `linear-gradient(90deg,${C.teal},${C.sky})`, borderRadius: 6, transition: 'width 0.4s' }} />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input type="number" value={stepsInput} onChange={(e) => setStepsInput(e.target.value)} placeholder="걸음 수 입력" style={{ flex: 1, background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 7, padding: '8px 10px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none' }} />
+                <button onClick={() => { if (stepsInput) { void addStepsLog({ date: todayStr, steps: Number(stepsInput) }); setStepsInput(''); } }} style={{ padding: '8px 16px', borderRadius: 7, background: `${C.teal}20`, border: `1px solid ${C.teal}50`, color: C.teal, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>기록</button>
+              </div>
+            </div>
+
+            {/* Weight log form + list */}
+            <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.b0}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Scale size={13} color={C.sky} />
+                <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>체중 기록</span>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: C.t1, fontSize: 11 }}>키</span>
+                  <input type="number" value={heightCm} onChange={(e) => setHeightCm(Number(e.target.value))} style={{ width: 52, background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 6, padding: '4px 6px', color: C.t0, fontSize: 12, fontFamily: font, outline: 'none' }} />
+                  <span style={{ color: C.t1, fontSize: 11 }}>cm</span>
+                </div>
+              </div>
+              <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.b0}`, display: 'flex', gap: 8 }}>
+                <input type="date" value={weightDate} onChange={(e) => setWeightDate(e.target.value)} style={{ background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 7, padding: '7px 10px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none' }} />
+                <input type="number" value={weightInput} onChange={(e) => setWeightInput(e.target.value)} placeholder="체중 (kg)" step="0.1" style={{ flex: 1, background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 7, padding: '7px 10px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none' }} />
+                <button onClick={() => { if (weightInput) { void addWeightLog({ date: weightDate, weight: Number(weightInput) }); setWeightInput(''); } }} style={{ padding: '7px 16px', borderRadius: 7, background: `${C.sky}20`, border: `1px solid ${C.sky}50`, color: C.sky, fontSize: 13, fontFamily: font, cursor: 'pointer' }}><Plus size={14} /></button>
+              </div>
+              {weightLogs.length === 0 && <div style={{ padding: '20px 16px', color: C.t1, fontSize: 13, textAlign: 'center' }}>기록이 없습니다</div>}
+              {[...weightLogs].reverse().slice(0, 10).map((w) => (
+                <div key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', borderTop: `1px solid ${C.b0}` }}>
+                  <span style={{ color: C.t1, fontSize: 12, flex: 1 }}>{w.date}</span>
+                  <span style={{ color: C.sky, fontSize: 14, fontWeight: 700, fontFamily: mono }}>{w.weight}kg</span>
+                  <button onClick={() => void removeWeightLog(w.id)} style={{ color: C.t1, cursor: 'pointer', display: 'flex' }}><Trash2 size={12} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Right panel: desktop only ── */}
@@ -517,6 +638,11 @@ export function HealthView() {
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: `${C.violet}10`, border: `1px solid ${C.violet}30`, borderRadius: 10, cursor: 'pointer', fontFamily: font }}>
                   <Moon size={14} color={C.violet} />
                   <span style={{ color: C.violet, fontSize: 13, fontWeight: 600 }}>수면 기록 추가</span>
+                </button>
+                <button onClick={() => setTab('body')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: `${C.sky}10`, border: `1px solid ${C.sky}30`, borderRadius: 10, cursor: 'pointer', fontFamily: font }}>
+                  <Scale size={14} color={C.sky} />
+                  <span style={{ color: C.sky, fontSize: 13, fontWeight: 600 }}>신체 지표 기록</span>
                 </button>
               </div>
             </div>
