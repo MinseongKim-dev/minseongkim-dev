@@ -5,6 +5,7 @@ import { Header } from './shared/layout/Header';
 import { BottomNav } from './shared/layout/BottomNav';
 import { ChatPanel } from './shared/ui/ChatPanel';
 import { ToastContainer } from './shared/ui/ToastContainer';
+import { QuickCapture } from './shared/components/QuickCapture';
 import { useAppStore } from './shared/stores/app.store';
 import { useWindowSize } from './shared/hooks/useWindowSize';
 
@@ -54,6 +55,7 @@ function NodeApp() {
         chatOpen && <ChatPanel />
       )}
       <ToastContainer />
+      <QuickCapture />
     </div>
   );
 }
