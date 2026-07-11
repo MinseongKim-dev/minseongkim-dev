@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   Calendar, CheckSquare, DollarSign, Activity,
-  BookOpen, Briefcase, Users, Zap, AlertTriangle, Sparkles,
+  BookOpen, Briefcase, Users, Zap, AlertTriangle, Sparkles, Circle, CheckCircle2,
 } from 'lucide-react';
 import { useAppStore, type ViewId } from '../../shared/stores/app.store';
+import { useWindowSize } from '../../shared/hooks/useWindowSize';
 import { useTasksStore } from '../../shared/stores/tasks.store';
 import { useEventsStore } from '../../shared/stores/events.store';
 import { useFinanceStore } from '../../shared/stores/finance.store';
@@ -88,6 +89,7 @@ const HIGHLIGHT_COLORS: Record<string, string> = {
 
 export function DashboardView() {
   const { setView } = useAppStore();
+  const { isMobile } = useWindowSize();
   const { items: tasks, fetch: fetchTasks } = useTasksStore();
   const { items: events, fetch: fetchEvents } = useEventsStore();
   const { items: transactions, fetch: fetchTransactions } = useFinanceStore();
@@ -279,8 +281,19 @@ export function DashboardView() {
   const briefingDate = briefing?.date;
   const isToday = briefingDate === todayStr;
 
+  const pendingTasks = tasks.filter((t) => !t.done).slice(0, 6);
+  const upcomingEvents = events
+    .filter((e) => e.date >= todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
+    .slice(0, 5);
+  const monthBudget = transactions
+    .filter((t) => t.type === 'income' && t.date >= firstOfMonth)
+    .reduce((s, t) => s + t.amount, 0);
+
   return (
-    <div style={{ fontFamily: font }}>
+    <div style={{ fontFamily: font, display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      {/* LEFT: main content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
       {/* Greeting */}
       <div style={{ marginBottom: 14, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         <h1 style={{ color: C.t0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px' }}>안녕하세요 👋</h1>
@@ -391,11 +404,119 @@ export function DashboardView() {
       )}
 
       {/* Domain grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
         {DOMAIN_CARDS.map((card) => (
           <DomainCard key={card.id} card={card} onClick={() => setView(card.id)} />
         ))}
       </div>
+      </div>{/* end LEFT */}
+
+      {/* RIGHT panel (desktop only) */}
+      {!isMobile && (
+        <div style={{ width: 272, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+          {/* 오늘 할 일 */}
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <CheckSquare size={13} color={C.blue} />
+                <span style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>오늘 할 일</span>
+              </div>
+              <button onClick={() => setView('tasks')} style={{ color: C.blue, fontSize: 11, cursor: 'pointer', fontFamily: font }}>전체 →</button>
+            </div>
+            {pendingTasks.length === 0 ? (
+              <p style={{ color: C.t2, fontSize: 12, textAlign: 'center', padding: '8px 0' }}>모두 완료 ✓</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {pendingTasks.map((t) => (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ marginTop: 2, flexShrink: 0 }}>
+                      {t.done
+                        ? <CheckCircle2 size={13} color={C.teal} />
+                        : <Circle size={13} color={C.t2} />}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ color: C.t0, fontSize: 12.5, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</p>
+                      {t.due && (
+                        <span style={{ color: t.due <= todayStr ? C.rose : C.t2, fontSize: 10.5, fontFamily: mono }}>{t.due}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 다가오는 일정 */}
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <Calendar size={13} color={C.violet} />
+                <span style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>다가오는 일정</span>
+              </div>
+              <button onClick={() => setView('schedule')} style={{ color: C.violet, fontSize: 11, cursor: 'pointer', fontFamily: font }}>전체 →</button>
+            </div>
+            {upcomingEvents.length === 0 ? (
+              <p style={{ color: C.t2, fontSize: 12, textAlign: 'center', padding: '8px 0' }}>예정된 일정 없음</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {upcomingEvents.map((e) => (
+                  <div key={e.id} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                    <div style={{
+                      flexShrink: 0, background: `${C.violet}18`, borderRadius: 6,
+                      padding: '3px 7px', textAlign: 'center', minWidth: 44,
+                    }}>
+                      <div style={{ color: C.violet, fontSize: 10, fontFamily: mono, fontWeight: 600 }}>
+                        {e.date === todayStr ? '오늘' : e.date.slice(5)}
+                      </div>
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ color: C.t0, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</p>
+                      {e.time && <span style={{ color: C.t2, fontSize: 10.5, fontFamily: mono }}>{e.time}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 이번 달 재정 */}
+          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <DollarSign size={13} color={C.amber} />
+                <span style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>이번 달 재정</span>
+              </div>
+              <button onClick={() => setView('finance')} style={{ color: C.amber, fontSize: 11, cursor: 'pointer', fontFamily: font }}>전체 →</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: C.t1, fontSize: 12 }}>수입</span>
+                <span style={{ color: C.teal, fontSize: 13, fontWeight: 600, fontFamily: mono }}>
+                  {monthBudget > 0 ? `+${monthBudget.toLocaleString()}원` : '0원'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: C.t1, fontSize: 12 }}>지출</span>
+                <span style={{ color: monthExpense > 0 ? C.rose : C.t1, fontSize: 13, fontWeight: 600, fontFamily: mono }}>
+                  {monthExpense > 0 ? `-${monthExpense.toLocaleString()}원` : '0원'}
+                </span>
+              </div>
+              <div style={{ height: 1, background: C.b1, margin: '2px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: C.t1, fontSize: 12 }}>순수익</span>
+                <span style={{
+                  fontSize: 13, fontWeight: 700, fontFamily: mono,
+                  color: monthBudget - monthExpense >= 0 ? C.teal : C.rose,
+                }}>
+                  {(monthBudget - monthExpense).toLocaleString()}원
+                </span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
     </div>
   );
 }
