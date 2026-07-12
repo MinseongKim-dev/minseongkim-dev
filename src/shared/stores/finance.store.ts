@@ -34,6 +34,7 @@ interface FinanceStore {
   budgets: Budget[];
   savingsGoals: SavingsGoal[];
   loading: boolean;
+  aiLoading: boolean;
   fetch: () => Promise<void>;
   add: (data: Omit<Transaction, 'id'>) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -44,6 +45,7 @@ interface FinanceStore {
   addSavingsGoal: (data: Omit<SavingsGoal, 'id'>) => Promise<void>;
   updateSavingsGoal: (id: string, data: Partial<SavingsGoal>) => Promise<void>;
   removeSavingsGoal: (id: string) => Promise<void>;
+  analyzeFinance: (summary: { income: number; expense: number; byCategory: Record<string, number>; month: string }) => Promise<string>;
 }
 
 export const useFinanceStore = create<FinanceStore>((set) => ({
@@ -51,6 +53,7 @@ export const useFinanceStore = create<FinanceStore>((set) => ({
   budgets: [],
   savingsGoals: [],
   loading: false,
+  aiLoading: false,
 
   fetch: async () => {
     set({ loading: true });
@@ -140,5 +143,18 @@ export const useFinanceStore = create<FinanceStore>((set) => ({
     await api.delete<unknown>(`/savings-goals/${id}`).catch((err) => {
       useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
     });
+  },
+
+  analyzeFinance: async (summary) => {
+    set({ aiLoading: true });
+    try {
+      const result = await api.post<{ analysis: string }>('/ai/finance-analysis', summary);
+      return result.analysis ?? '';
+    } catch {
+      useToastStore.getState().add('AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      return '';
+    } finally {
+      set({ aiLoading: false });
+    }
   },
 }));

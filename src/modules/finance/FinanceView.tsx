@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, TrendingUp, TrendingDown, Target, PiggyBank } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, Target, PiggyBank, Sparkles, Loader } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useFinanceStore, type TxType } from '../../shared/stores/finance.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
@@ -53,14 +53,15 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   );
 };
 
-type TabId = 'transactions' | 'budget' | 'savings';
+type TabId = 'transactions' | 'budget' | 'savings' | 'analysis';
 
 export function FinanceView() {
   const {
-    items, budgets, savingsGoals, loading,
+    items, budgets, savingsGoals, loading, aiLoading,
     fetch, add, remove,
     fetchBudgets, setBudget, removeBudget,
     fetchSavingsGoals, addSavingsGoal, updateSavingsGoal, removeSavingsGoal,
+    analyzeFinance,
   } = useFinanceStore();
   const { isMobile } = useWindowSize();
 
@@ -87,6 +88,9 @@ export function FinanceView() {
   const [savingsDate, setSavingsDate] = useState('');
   const [depositGoalId, setDepositGoalId] = useState<string | null>(null);
   const [depositAmount, setDepositAmount] = useState('');
+
+  // FIN-06: AI analysis
+  const [aiAnalysis, setAiAnalysis] = useState('');
 
   useEffect(() => {
     fetch();
@@ -255,8 +259,8 @@ export function FinanceView() {
     >{label}</button>
   );
 
-  const rightFormLabel = tab === 'transactions' ? '새 거래' : tab === 'budget' ? '예산 설정' : '저축 목표';
-  const rightFormAccent = tab === 'transactions' ? C.blue : tab === 'budget' ? C.amber : C.sky;
+  const rightFormLabel = tab === 'transactions' ? '새 거래' : tab === 'budget' ? '예산 설정' : tab === 'savings' ? '저축 목표' : 'AI 분석';
+  const rightFormAccent = tab === 'transactions' ? C.blue : tab === 'budget' ? C.amber : tab === 'savings' ? C.sky : C.violet;
 
   return (
     <div style={{ fontFamily: font, display: 'flex', gap: 20, alignItems: 'flex-start' }}>
@@ -293,6 +297,7 @@ export function FinanceView() {
           {tabBtn('transactions', '거래 내역')}
           {tabBtn('budget', '예산 관리')}
           {tabBtn('savings', '저축 목표')}
+          {tabBtn('analysis', 'AI 분석')}
         </div>
 
         {/* Transactions tab */}
@@ -522,6 +527,77 @@ export function FinanceView() {
             )}
           </>
         )}
+
+        {/* AI Analysis tab */}
+        {tab === 'analysis' && (() => {
+          const monthStr = new Date().toISOString().slice(0, 7);
+          const byCategory = EXPENSE_CATEGORIES.reduce<Record<string, number>>((acc, cat) => {
+            acc[cat] = items
+              .filter((t) => t.type === 'expense' && t.category === cat && t.date >= firstOfMonth)
+              .reduce((s, t) => s + t.amount, 0);
+            return acc;
+          }, {});
+          const topCategories = Object.entries(byCategory)
+            .filter(([, v]) => v > 0)
+            .sort(([, a], [, b]) => b - a);
+
+          return (
+            <>
+              {/* Category breakdown */}
+              <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '16px 18px', marginBottom: 16 }}>
+                <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 14 }}>이번 달 카테고리별 지출</p>
+                {topCategories.length === 0 && (
+                  <p style={{ color: C.t2, fontSize: 13 }}>이번 달 지출 내역이 없습니다.</p>
+                )}
+                {topCategories.map(([cat, amount]) => {
+                  const pct = monthExpense > 0 ? (amount / monthExpense) * 100 : 0;
+                  return (
+                    <div key={cat} style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ color: C.t0, fontSize: 12.5 }}>{cat}</span>
+                        <span style={{ color: C.rose, fontSize: 12, fontFamily: mono }}>{fmt(amount)}</span>
+                      </div>
+                      <div style={{ height: 4, background: C.bg3, borderRadius: 2 }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: C.rose, borderRadius: 2, opacity: 0.7 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* AI generate button */}
+              <button
+                onClick={async () => {
+                  const result = await analyzeFinance({ income: monthIncome, expense: monthExpense, byCategory, month: monthStr });
+                  if (result) setAiAnalysis(result);
+                }}
+                disabled={aiLoading || monthExpense === 0}
+                style={{
+                  width: '100%', padding: '12px', borderRadius: 10, marginBottom: 16,
+                  background: aiLoading || monthExpense === 0 ? C.b1 : `linear-gradient(135deg, ${C.violet}, #9B7CF5)`,
+                  color: aiLoading || monthExpense === 0 ? C.t1 : '#fff',
+                  fontSize: 13.5, fontWeight: 600, fontFamily: font, cursor: aiLoading || monthExpense === 0 ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                {aiLoading
+                  ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> AI 분석 중…</>
+                  : <><Sparkles size={14} />AI 지출 분석</>
+                }
+              </button>
+
+              {aiAnalysis && (
+                <div style={{ background: C.bg2, border: `1px solid ${C.violet}30`, borderRadius: 12, padding: '16px 18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <Sparkles size={13} color={C.violet} />
+                    <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>AI 분석 결과</span>
+                  </div>
+                  <p style={{ color: C.t0, fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{aiAnalysis}</p>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* ── Right panel: desktop only ── */}
@@ -557,12 +633,14 @@ export function FinanceView() {
           </div>
 
           {/* Add form */}
-          <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
-            <p style={{ color: rightFormAccent, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>{rightFormLabel}</p>
-            {tab === 'transactions' && TxForm}
-            {tab === 'budget' && BudgetForm}
-            {tab === 'savings' && SavingsForm}
-          </div>
+          {tab !== 'analysis' && (
+            <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+              <p style={{ color: rightFormAccent, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>{rightFormLabel}</p>
+              {tab === 'transactions' && TxForm}
+              {tab === 'budget' && BudgetForm}
+              {tab === 'savings' && SavingsForm}
+            </div>
+          )}
         </div>
       )}
     </div>

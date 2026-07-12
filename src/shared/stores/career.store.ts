@@ -178,6 +178,7 @@ interface CareerStore {
   addSalaryRecord: (data: Omit<SalaryRecord, 'id'>) => Promise<void>;
   updateSalaryRecord: (id: string, data: Partial<SalaryRecord>) => Promise<void>;
   removeSalaryRecord: (id: string) => Promise<void>;
+  generateStarStory: (achievementIds: string[], targetRole: string) => Promise<string>;
 }
 
 export const useCareerStore = create<CareerStore>((set, get) => ({
@@ -483,5 +484,19 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
     await api.delete<unknown>(`/salary/${id}`).catch((err) => {
       useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
     });
+  },
+
+  generateStarStory: async (achievementIds, targetRole) => {
+    set({ aiLoading: true });
+    try {
+      const achievements = get().achievements.filter((a) => achievementIds.includes(a.id));
+      const result = await api.post<{ story: string }>('/ai/star-story', { achievements, targetRole });
+      return result.story ?? '';
+    } catch {
+      useToastStore.getState().add('자소서 생성에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      return '';
+    } finally {
+      set({ aiLoading: false });
+    }
   },
 }));
