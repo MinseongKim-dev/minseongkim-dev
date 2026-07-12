@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Circle, Plus, Trash2, Tag, Folder, FolderOpen, ChevronRight, LayoutList, Columns3, GripVertical } from 'lucide-react';
+import { CheckCircle2, Circle, Plus, Trash2, Tag, Folder, FolderOpen, ChevronRight, LayoutList, Columns3, GripVertical, Target } from 'lucide-react';
 import { useTasksStore, type Priority, type Task, type TaskStatus, type Project } from '../../shared/stores/tasks.store';
+import { useLearningStore, type LearningGoal } from '../../shared/stores/learning.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
@@ -44,16 +45,18 @@ interface TaskRowProps {
   task: Task;
   subtasks: Task[];
   projects: Project[];
+  goals: LearningGoal[];
   toggle: (id: string, done: boolean) => void;
   remove: (id: string) => void;
   onAddSubtask: (parentId: string) => void;
   indent?: boolean;
 }
 
-function TaskRow({ task, subtasks, projects, toggle, remove, onAddSubtask, indent }: TaskRowProps) {
+function TaskRow({ task, subtasks, projects, goals, toggle, remove, onAddSubtask, indent }: TaskRowProps) {
   const [expanded, setExpanded] = useState(true);
   const hasSubtasks = subtasks.length > 0;
   const col = projColor(projects, task.projectId);
+  const linkedGoal = task.goalId ? goals.find((g) => g.id === task.goalId) : undefined;
 
   return (
     <>
@@ -88,7 +91,7 @@ function TaskRow({ task, subtasks, projects, toggle, remove, onAddSubtask, inden
             textDecoration: task.done ? 'line-through' : 'none',
             display: 'block',
           }}>{task.title}</span>
-          {(task.projectId || (task.tags ?? []).length > 0 || task.due) && (
+          {(task.projectId || linkedGoal || (task.tags ?? []).length > 0 || task.due) && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, alignItems: 'center' }}>
               {task.projectId && (
                 <span style={{
@@ -97,6 +100,14 @@ function TaskRow({ task, subtasks, projects, toggle, remove, onAddSubtask, inden
                 }}>
                   <Folder size={8} />
                   {projects.find((p) => p.id === task.projectId)?.name ?? ''}
+                </span>
+              )}
+              {linkedGoal && (
+                <span style={{
+                  fontSize: 10, display: 'flex', alignItems: 'center', gap: 3,
+                  color: C.sky, background: `${C.sky}18`, borderRadius: 5, padding: '2px 7px',
+                }}>
+                  <Target size={8} />{linkedGoal.title}
                 </span>
               )}
               {(task.tags ?? []).map((tag) => (
@@ -141,6 +152,7 @@ function TaskRow({ task, subtasks, projects, toggle, remove, onAddSubtask, inden
           task={sub}
           subtasks={[]}
           projects={projects}
+          goals={goals}
           toggle={toggle}
           remove={remove}
           onAddSubtask={onAddSubtask}
@@ -220,24 +232,26 @@ function KanbanCard({ task, projects, onRemove, isDragOverlay }: KanbanCardProps
 
 interface AddTaskFormProps {
   projects: Project[];
+  goals: LearningGoal[];
   parentLabel?: string;
-  onSubmit: (data: { title: string; priority: Priority; due?: string; tags?: string[]; projectId?: string }) => void;
+  onSubmit: (data: { title: string; priority: Priority; due?: string; tags?: string[]; projectId?: string; goalId?: string }) => void;
   onCancel?: () => void;
 }
 
-function AddTaskForm({ projects, parentLabel, onSubmit, onCancel }: AddTaskFormProps) {
+function AddTaskForm({ projects, goals, parentLabel, onSubmit, onCancel }: AddTaskFormProps) {
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
   const [due, setDue] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [projectId, setProjectId] = useState('');
+  const [goalId, setGoalId] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
     const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
-    onSubmit({ title: title.trim(), priority, due: due || undefined, tags: tags.length ? tags : undefined, projectId: projectId || undefined });
-    setTitle(''); setDue(''); setTagsInput(''); setPriority('medium'); setProjectId('');
+    onSubmit({ title: title.trim(), priority, due: due || undefined, tags: tags.length ? tags : undefined, projectId: projectId || undefined, goalId: goalId || undefined });
+    setTitle(''); setDue(''); setTagsInput(''); setPriority('medium'); setProjectId(''); setGoalId('');
   };
 
   return (
@@ -272,6 +286,16 @@ function AddTaskForm({ projects, parentLabel, onSubmit, onCancel }: AddTaskFormP
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       )}
+      {!parentLabel && goals.length > 0 && (
+        <select
+          value={goalId}
+          onChange={(e) => setGoalId(e.target.value)}
+          style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: goalId ? C.t0 : C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer' }}
+        >
+          <option value="">학습 목표 없음</option>
+          {goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+        </select>
+      )}
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="submit" style={{ flex: 1, padding: '9px', background: C.blue, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer' }}>추가</button>
         {onCancel && (
@@ -284,6 +308,7 @@ function AddTaskForm({ projects, parentLabel, onSubmit, onCancel }: AddTaskFormP
 
 export function TasksView() {
   const { items, projects, loading, fetch, add, toggle, setStatus, remove, addProject, removeProject } = useTasksStore();
+  const { goals: learningGoals } = useLearningStore();
   const { isMobile } = useWindowSize();
   const [tab, setTab] = useState<TabId>('all');
   const [showForm, setShowForm] = useState(false);
@@ -347,7 +372,7 @@ export function TasksView() {
     subtasksMap[t.parentTaskId!].push(t);
   });
 
-  const handleAdd = async (data: { title: string; priority: Priority; due?: string; tags?: string[]; projectId?: string }) => {
+  const handleAdd = async (data: { title: string; priority: Priority; due?: string; tags?: string[]; projectId?: string; goalId?: string }) => {
     await add({ ...data, parentTaskId: addingParentId ?? undefined });
     setShowForm(false);
     setAddingParentId(null);
@@ -444,6 +469,7 @@ export function TasksView() {
                 task={task}
                 subtasks={subtasksMap[task.id] ?? []}
                 projects={projects}
+                goals={learningGoals}
                 toggle={toggle}
                 remove={remove}
                 onAddSubtask={openAddSubtask}
@@ -460,6 +486,7 @@ export function TasksView() {
           {showForm && addingParentId && (
             <AddTaskForm
               projects={projects}
+              goals={learningGoals}
               parentLabel={items.find((t) => t.id === addingParentId)?.title ?? ''}
               onSubmit={handleAdd}
               onCancel={() => { setShowForm(false); setAddingParentId(null); }}
@@ -477,6 +504,7 @@ export function TasksView() {
           {isMobile && showForm && !addingParentId && (
             <AddTaskForm
               projects={projects}
+              goals={learningGoals}
               onSubmit={handleAdd}
               onCancel={() => setShowForm(false)}
             />
@@ -581,6 +609,7 @@ export function TasksView() {
                         task={task}
                         subtasks={subtasksMap[task.id] ?? []}
                         projects={projects}
+                        goals={learningGoals}
                         toggle={toggle}
                         remove={remove}
                         onAddSubtask={openAddSubtask}
@@ -610,6 +639,7 @@ export function TasksView() {
           {showForm && addingParentId && (
             <AddTaskForm
               projects={projects}
+              goals={learningGoals}
               parentLabel={items.find((t) => t.id === addingParentId)?.title ?? ''}
               onSubmit={handleAdd}
               onCancel={() => { setShowForm(false); setAddingParentId(null); }}
@@ -626,6 +656,7 @@ export function TasksView() {
           {isMobile && showForm && !addingParentId && (
             <AddTaskForm
               projects={projects}
+              goals={learningGoals}
               onSubmit={handleAdd}
               onCancel={() => setShowForm(false)}
             />
@@ -700,6 +731,7 @@ export function TasksView() {
             <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>새 할 일</p>
             <AddTaskForm
               projects={projects}
+              goals={learningGoals}
               onSubmit={handleAdd}
               onCancel={() => {}}
             />

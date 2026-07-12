@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { ChevronRight, Loader, Zap, Target, Brain, GitBranch, RefreshCw, Plus, Trash2, Award, Layers, MapPin, CheckCircle2, Circle, PauseCircle, Briefcase, BookOpen, GraduationCap, Smile, Frown, Meh, Clock, TrendingUp, DollarSign, AlertTriangle } from 'lucide-react';
 import { useCareerStore, type CareerTarget, type CareerPath, type CoachLog, type Skill, type Achievement, type SkillLevel, type CareerGoal, type GoalHorizon, type JobStage, type CertStatus } from '../../shared/stores/career.store';
+import { useLearningStore } from '../../shared/stores/learning.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
 const C = {
@@ -1189,6 +1190,7 @@ const CERT_STATUS_META: Record<CertStatus, { label: string; color: string }> = {
 
 function CertsTab() {
   const { certifications, addCertification, updateCertification, removeCertification } = useCareerStore();
+  const { goals: learningGoals } = useLearningStore();
   const { isMobile } = useWindowSize();
   const inp: React.CSSProperties = {
     background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8,
@@ -1202,13 +1204,14 @@ function CertsTab() {
   const [status, setStatus] = useState<CertStatus>('planned');
   const [obtainedDate, setObtainedDate] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
+  const [linkedLearningGoalId, setLinkedLearningGoalId] = useState('');
   const [showForm, setShowForm] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !issuer.trim()) return;
-    await addCertification({ name: name.trim(), issuer: issuer.trim(), status, obtainedDate: obtainedDate || undefined, expiryDate: expiryDate || undefined });
-    setName(''); setIssuer(''); setStatus('planned'); setObtainedDate(''); setExpiryDate('');
+    await addCertification({ name: name.trim(), issuer: issuer.trim(), status, obtainedDate: obtainedDate || undefined, expiryDate: expiryDate || undefined, linkedLearningGoalId: linkedLearningGoalId || undefined });
+    setName(''); setIssuer(''); setStatus('planned'); setObtainedDate(''); setExpiryDate(''); setLinkedLearningGoalId('');
     if (isMobile) setShowForm(false);
   };
 
@@ -1228,6 +1231,12 @@ function CertsTab() {
       {(status === 'obtained' || status === 'expired') && (
         <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
           placeholder="만료일" style={{ ...inp, colorScheme: 'dark' }} />
+      )}
+      {learningGoals.length > 0 && (
+        <select value={linkedLearningGoalId} onChange={(e) => setLinkedLearningGoalId(e.target.value)} style={{ ...sel, color: linkedLearningGoalId ? C.t0 : C.t1 }}>
+          <option value="">학습 목표 연결 없음</option>
+          {learningGoals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+        </select>
       )}
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="submit" style={{ flex: 1, padding: '9px', background: C.teal, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer' }}>추가</button>
@@ -1278,6 +1287,14 @@ function CertsTab() {
                       만료: {cert.expiryDate}
                     </div>
                   )}
+                  {cert.linkedLearningGoalId && (() => {
+                    const goal = learningGoals.find((g) => g.id === cert.linkedLearningGoalId);
+                    return goal ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, color: C.sky, fontSize: 10.5, background: `${C.sky}12`, borderRadius: 5, padding: '3px 8px', width: 'fit-content' }}>
+                        <GraduationCap size={9} />{goal.title}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
               ))}
             </div>

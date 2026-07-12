@@ -12,6 +12,7 @@ export interface CalendarEvent {
   category?: string;
   recurrence?: RecurrenceType;
   recurrenceGroupId?: string;
+  contactId?: string;
 }
 
 interface EventsStore {
