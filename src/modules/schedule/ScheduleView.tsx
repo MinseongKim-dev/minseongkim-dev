@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Clock, Plus, Trash2, AlertTriangle, Repeat } from 'lucide-react';
+import { Clock, Plus, Trash2, AlertTriangle, Repeat, Users } from 'lucide-react';
 import { useEventsStore, type CalendarEvent, type RecurrenceType } from '../../shared/stores/events.store';
+import { useRelationshipsStore } from '../../shared/stores/relationships.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
 const C = {
@@ -62,6 +63,7 @@ function detectConflicts(events: CalendarEvent[]): Set<string> {
 
 export function ScheduleView() {
   const { items, loading, fetch, add, addRecurring, remove, removeGroup } = useEventsStore();
+  const { items: contacts, addMeeting } = useRelationshipsStore();
   const { isMobile } = useWindowSize();
   const todayStr = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState(todayStr);
@@ -70,6 +72,7 @@ export function ScheduleView() {
   const [date, setDate] = useState(todayStr);
   const [time, setTime] = useState('');
   const [category, setCategory] = useState('work');
+  const [contactId, setContactId] = useState('');
   const [recurrence, setRecurrence] = useState<RecurrenceType>('none');
   const [recurrenceCount, setRecurrenceCount] = useState(8);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; groupId?: string } | null>(null);
@@ -90,13 +93,16 @@ export function ScheduleView() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    const base = { title: title.trim(), date, time: time || undefined, category };
+    const base = { title: title.trim(), date, time: time || undefined, category, contactId: contactId || undefined };
     if (recurrence !== 'none') {
       await addRecurring(base, recurrence, recurrenceCount);
     } else {
       await add(base);
     }
-    setTitle(''); setTime(''); setRecurrence('none');
+    if (contactId && recurrence === 'none') {
+      await addMeeting({ contactId, date, type: 'meeting', notes: title.trim() });
+    }
+    setTitle(''); setTime(''); setRecurrence('none'); setContactId('');
     if (isMobile) setShowForm(false);
   };
 
@@ -134,6 +140,16 @@ export function ScheduleView() {
           <option key={val} value={val}>{label}</option>
         ))}
       </select>
+      {category === 'meeting' && contacts.length > 0 && (
+        <select
+          value={contactId}
+          onChange={(e) => setContactId(e.target.value)}
+          style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: contactId ? C.t0 : C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer' }}
+        >
+          <option value="">연락처 연결 없음</option>
+          {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      )}
       <div style={{ display: 'flex', gap: 8 }}>
         <select
           value={recurrence} onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
@@ -252,6 +268,14 @@ export function ScheduleView() {
                             <Repeat size={9} />반복
                           </span>
                         )}
+                        {ev.contactId && (() => {
+                          const contact = contacts.find((c) => c.id === ev.contactId);
+                          return contact ? (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: C.teal, background: `${C.teal}18`, borderRadius: 4, padding: '1px 6px' }}>
+                              <Users size={9} />{contact.name}
+                            </span>
+                          ) : null;
+                        })()}
                       </div>
                       {ev.time && (
                         <p style={{ color: C.t1, fontSize: 11.5, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>

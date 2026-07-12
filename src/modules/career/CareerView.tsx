@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { ChevronRight, Loader, Zap, Target, Brain, GitBranch, RefreshCw, Plus, Trash2, Award, Layers, MapPin, CheckCircle2, Circle, PauseCircle, Briefcase, BookOpen, GraduationCap, Smile, Frown, Meh, Clock, TrendingUp, DollarSign, AlertTriangle } from 'lucide-react';
 import { useCareerStore, type CareerTarget, type CareerPath, type CoachLog, type Skill, type Achievement, type SkillLevel, type CareerGoal, type GoalHorizon, type JobStage, type CertStatus } from '../../shared/stores/career.store';
+import { useLearningStore } from '../../shared/stores/learning.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
 const C = {
@@ -649,7 +650,7 @@ function SkillsTab() {
 // Achievements Tab (CAR-03)
 // ---------------------------------------------------------------------------
 function AchievementsTab() {
-  const { achievements, addAchievement, removeAchievement } = useCareerStore();
+  const { achievements, aiLoading, addAchievement, removeAchievement, generateStarStory } = useCareerStore();
   const [showForm, setShowForm] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -659,6 +660,26 @@ function AchievementsTab() {
   const [result, setResult] = useState('');
   const [impact, setImpact] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // CAR-08: STAR 자소서 generation
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [targetRole, setTargetRole] = useState('');
+  const [generatedStory, setGeneratedStory] = useState('');
+  const [showGenerator, setShowGenerator] = useState(false);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleGenerate = async () => {
+    if (selectedIds.size === 0) return;
+    const story = await generateStarStory(Array.from(selectedIds), targetRole);
+    if (story) setGeneratedStory(story);
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -727,12 +748,25 @@ function AchievementsTab() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {[...achievements].sort((a, b) => b.date.localeCompare(a.date)).map((ach) => {
           const isExpanded = expanded === ach.id;
+          const isSelected = selectedIds.has(ach.id);
           return (
-            <div key={ach.id} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, overflow: 'hidden' }}>
+            <div key={ach.id} style={{ background: C.bg2, border: `1px solid ${isSelected ? `${C.violet}60` : C.b1}`, borderRadius: 10, overflow: 'hidden', transition: 'border-color 0.15s' }}>
               <div
                 onClick={() => setExpanded(isExpanded ? null : ach.id)}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', cursor: 'pointer' }}
               >
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleSelect(ach.id); }}
+                  title="자소서 생성에 포함"
+                  style={{
+                    width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                    background: isSelected ? C.violet : 'transparent',
+                    border: `1.5px solid ${isSelected ? C.violet : C.t2}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  }}
+                >
+                  {isSelected && <span style={{ color: '#fff', fontSize: 11, lineHeight: 1 }}>✓</span>}
+                </button>
                 <div style={{ width: 34, height: 34, borderRadius: 8, background: `${C.teal}14`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Award size={16} color={C.teal} />
                 </div>
@@ -760,6 +794,76 @@ function AchievementsTab() {
           );
         })}
       </div>
+
+      {/* CAR-08: STAR 자소서 Generator */}
+      {achievements.length > 0 && (
+        <div style={{ marginTop: 24, background: C.bg2, border: `1px solid ${C.violet}30`, borderRadius: 12, padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Zap size={14} color={C.violet} />
+            <span style={{ color: C.t0, fontSize: 13.5, fontWeight: 700 }}>AI 자소서 생성</span>
+            <span style={{ color: C.t1, fontSize: 11, marginLeft: 4 }}>
+              {selectedIds.size > 0 ? `${selectedIds.size}개 성과 선택됨` : '위 성과를 체크하여 선택'}
+            </span>
+            <button
+              onClick={() => setShowGenerator(!showGenerator)}
+              style={{ marginLeft: 'auto', color: C.t1, cursor: 'pointer', fontSize: 11, fontFamily: font }}
+            >
+              {showGenerator ? '접기' : '펼치기'}
+            </button>
+          </div>
+
+          {showGenerator && (
+            <>
+              <input
+                value={targetRole}
+                onChange={(e) => setTargetRole(e.target.value)}
+                placeholder="지원 포지션 / 회사 (예: 카카오 프론트엔드 엔지니어)"
+                style={{
+                  width: '100%', background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8,
+                  padding: '9px 12px', color: C.t0, fontSize: 13, fontFamily: font,
+                  outline: 'none', boxSizing: 'border-box', marginBottom: 10,
+                }}
+              />
+              <button
+                onClick={handleGenerate}
+                disabled={aiLoading || selectedIds.size === 0}
+                style={{
+                  width: '100%', padding: '11px', borderRadius: 9, fontSize: 13.5, fontWeight: 600,
+                  fontFamily: font, cursor: aiLoading || selectedIds.size === 0 ? 'not-allowed' : 'pointer',
+                  background: aiLoading || selectedIds.size === 0 ? C.b1 : C.violet,
+                  color: aiLoading || selectedIds.size === 0 ? C.t1 : '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  marginBottom: generatedStory ? 12 : 0,
+                }}
+              >
+                {aiLoading ? <><Spinner /> 생성 중…</> : <><Zap size={14} />자소서 생성</>}
+              </button>
+
+              {generatedStory && (
+                <div style={{ marginTop: 12 }}>
+                  <p style={{ color: C.t1, fontSize: 11, marginBottom: 6 }}>생성된 자소서 — 복사하여 수정하세요</p>
+                  <textarea
+                    readOnly
+                    value={generatedStory}
+                    style={{
+                      width: '100%', minHeight: 200, background: C.bg3,
+                      border: `1px solid ${C.b1}`, borderRadius: 8,
+                      padding: '12px', color: C.t0, fontSize: 13, fontFamily: font,
+                      lineHeight: 1.7, resize: 'vertical', boxSizing: 'border-box',
+                    }}
+                  />
+                  <button
+                    onClick={() => navigator.clipboard?.writeText(generatedStory)}
+                    style={{ marginTop: 6, color: C.violet, fontSize: 11.5, fontFamily: font, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
+                  >
+                    복사
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1086,6 +1190,7 @@ const CERT_STATUS_META: Record<CertStatus, { label: string; color: string }> = {
 
 function CertsTab() {
   const { certifications, addCertification, updateCertification, removeCertification } = useCareerStore();
+  const { goals: learningGoals } = useLearningStore();
   const { isMobile } = useWindowSize();
   const inp: React.CSSProperties = {
     background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8,
@@ -1099,13 +1204,14 @@ function CertsTab() {
   const [status, setStatus] = useState<CertStatus>('planned');
   const [obtainedDate, setObtainedDate] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
+  const [linkedLearningGoalId, setLinkedLearningGoalId] = useState('');
   const [showForm, setShowForm] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !issuer.trim()) return;
-    await addCertification({ name: name.trim(), issuer: issuer.trim(), status, obtainedDate: obtainedDate || undefined, expiryDate: expiryDate || undefined });
-    setName(''); setIssuer(''); setStatus('planned'); setObtainedDate(''); setExpiryDate('');
+    await addCertification({ name: name.trim(), issuer: issuer.trim(), status, obtainedDate: obtainedDate || undefined, expiryDate: expiryDate || undefined, linkedLearningGoalId: linkedLearningGoalId || undefined });
+    setName(''); setIssuer(''); setStatus('planned'); setObtainedDate(''); setExpiryDate(''); setLinkedLearningGoalId('');
     if (isMobile) setShowForm(false);
   };
 
@@ -1125,6 +1231,12 @@ function CertsTab() {
       {(status === 'obtained' || status === 'expired') && (
         <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
           placeholder="만료일" style={{ ...inp, colorScheme: 'dark' }} />
+      )}
+      {learningGoals.length > 0 && (
+        <select value={linkedLearningGoalId} onChange={(e) => setLinkedLearningGoalId(e.target.value)} style={{ ...sel, color: linkedLearningGoalId ? C.t0 : C.t1 }}>
+          <option value="">학습 목표 연결 없음</option>
+          {learningGoals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+        </select>
       )}
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="submit" style={{ flex: 1, padding: '9px', background: C.teal, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer' }}>추가</button>
@@ -1175,6 +1287,14 @@ function CertsTab() {
                       만료: {cert.expiryDate}
                     </div>
                   )}
+                  {cert.linkedLearningGoalId && (() => {
+                    const goal = learningGoals.find((g) => g.id === cert.linkedLearningGoalId);
+                    return goal ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, color: C.sky, fontSize: 10.5, background: `${C.sky}12`, borderRadius: 5, padding: '3px 8px', width: 'fit-content' }}>
+                        <GraduationCap size={9} />{goal.title}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
               ))}
             </div>

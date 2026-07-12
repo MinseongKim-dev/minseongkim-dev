@@ -2,6 +2,35 @@ import { create } from 'zustand';
 import { api } from '../api/client';
 import { useToastStore } from './toast.store';
 
+export interface Flashcard {
+  id: string;
+  front: string;
+  back: string;
+  category?: string;
+  easeFactor: number;
+  interval: number;
+  repetitions: number;
+  nextReview: string;
+  createdAt: string;
+}
+
+function sm2(card: Flashcard, quality: number): Pick<Flashcard, 'easeFactor' | 'interval' | 'repetitions' | 'nextReview'> {
+  let { easeFactor, interval, repetitions } = card;
+  if (quality < 3) {
+    repetitions = 0;
+    interval = 1;
+  } else {
+    if (repetitions === 0) interval = 1;
+    else if (repetitions === 1) interval = 6;
+    else interval = Math.round(interval * easeFactor);
+    easeFactor = Math.max(1.3, easeFactor + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+    repetitions += 1;
+  }
+  const next = new Date();
+  next.setDate(next.getDate() + interval);
+  return { easeFactor, interval, repetitions, nextReview: next.toISOString().split('T')[0] };
+}
+
 export interface LearningGoal {
   id: string;
   title: string;
@@ -32,6 +61,7 @@ interface LearningStore {
   goals: LearningGoal[];
   books: Book[];
   studyLogs: StudyLog[];
+  flashcards: Flashcard[];
   loading: boolean;
   fetch: () => Promise<void>;
   addGoal: (data: Omit<LearningGoal, 'id'>) => Promise<void>;
@@ -41,23 +71,28 @@ interface LearningStore {
   removeBook: (id: string) => Promise<void>;
   addStudyLog: (data: Omit<StudyLog, 'id'>) => Promise<void>;
   removeStudyLog: (id: string) => Promise<void>;
+  addFlashcard: (data: { front: string; back: string; category?: string }) => Promise<void>;
+  reviewFlashcard: (id: string, quality: number) => Promise<void>;
+  removeFlashcard: (id: string) => Promise<void>;
 }
 
-export const useLearningStore = create<LearningStore>((set) => ({
+export const useLearningStore = create<LearningStore>((set, get) => ({
   goals: [],
   books: [],
   studyLogs: [],
+  flashcards: [],
   loading: false,
 
   fetch: async () => {
     set({ loading: true });
     try {
-      const [goals, books, studyLogs] = await Promise.all([
+      const [goals, books, studyLogs, flashcards] = await Promise.all([
         api.get<LearningGoal[]>('/learning'),
         api.get<Book[]>('/books'),
         api.get<StudyLog[]>('/study'),
+        api.get<Flashcard[]>('/flashcards').catch(() => [] as Flashcard[]),
       ]);
-      set({ goals: goals ?? [], books: books ?? [], studyLogs: studyLogs ?? [] });
+      set({ goals: goals ?? [], books: books ?? [], studyLogs: studyLogs ?? [], flashcards: flashcards ?? [] });
     } catch (err) {
       useToastStore.getState().add(err instanceof Error ? err.message : '학습 데이터를 불러오지 못했습니다');
     } finally {
@@ -119,6 +154,39 @@ export const useLearningStore = create<LearningStore>((set) => ({
   removeStudyLog: async (id) => {
     set((s) => ({ studyLogs: s.studyLogs.filter((l) => l.id !== id) }));
     await api.delete<unknown>(`/study/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
+  },
+
+  addFlashcard: async ({ front, back, category }) => {
+    const today = new Date().toISOString().split('T')[0];
+    const payload: Omit<Flashcard, 'id'> = {
+      front, back, category,
+      easeFactor: 2.5, interval: 0, repetitions: 0,
+      nextReview: today, createdAt: today,
+    };
+    try {
+      const item = await api.post<Flashcard>('/flashcards', payload);
+      set((s) => ({ flashcards: [item, ...s.flashcards] }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '플래시카드 추가에 실패했습니다');
+      throw err;
+    }
+  },
+
+  reviewFlashcard: async (id, quality) => {
+    const card = get().flashcards.find((c) => c.id === id);
+    if (!card) return;
+    const updates = sm2(card, quality);
+    set((s) => ({ flashcards: s.flashcards.map((c) => (c.id === id ? { ...c, ...updates } : c)) }));
+    await api.put<Flashcard>(`/flashcards/${id}`, updates).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '업데이트에 실패했습니다');
+    });
+  },
+
+  removeFlashcard: async (id) => {
+    set((s) => ({ flashcards: s.flashcards.filter((c) => c.id !== id) }));
+    await api.delete<unknown>(`/flashcards/${id}`).catch((err) => {
       useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
     });
   },

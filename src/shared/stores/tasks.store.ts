@@ -23,6 +23,7 @@ export interface Task {
   tags?: string[];
   parentTaskId?: string;
   projectId?: string;
+  goalId?: string;
 }
 
 interface TasksStore {
@@ -30,7 +31,7 @@ interface TasksStore {
   projects: Project[];
   loading: boolean;
   fetch: () => Promise<void>;
-  add: (data: { title: string; priority: Priority; due?: string; tags?: string[]; parentTaskId?: string; projectId?: string }) => Promise<void>;
+  add: (data: { title: string; priority: Priority; due?: string; tags?: string[]; parentTaskId?: string; projectId?: string; goalId?: string }) => Promise<void>;
   toggle: (id: string, done: boolean) => Promise<void>;
   setStatus: (id: string, status: TaskStatus) => Promise<void>;
   updateTask: (id: string, data: Partial<Omit<Task, 'id'>>) => Promise<void>;
