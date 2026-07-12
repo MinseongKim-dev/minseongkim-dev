@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { X, CheckSquare, Calendar, Activity, Smile, Target } from 'lucide-react';
 import { useTasksStore } from '../stores/tasks.store';
 import { useEventsStore } from '../stores/events.store';
@@ -56,31 +56,19 @@ interface WeeklyReviewProps {
 }
 
 export function WeeklyReview({ triggerOpen, onClose }: WeeklyReviewProps) {
-  const [open, setOpen] = useState(false);
-  const [goals, setGoals] = useState('');
+  // Lazy inits — evaluated once at mount; avoids setState-in-effect lint errors
+  const { start, end, weekKey } = getWeekRange();
+  const [autoOpen, setAutoOpen] = useState(() => isSunday() && !hasReviewedThisWeek());
+  const [goals, setGoals] = useState(() => getSavedGoals(weekKey));
 
   const tasks = useTasksStore((s) => s.items);
   const events = useEventsStore((s) => s.items);
   const { items: workouts, moodLogs } = useHealthStore();
 
-  const { start, end, weekKey } = getWeekRange();
-
-  useEffect(() => {
-    if (triggerOpen) {
-      setGoals(getSavedGoals(weekKey));
-      setOpen(true);
-    }
-  }, [triggerOpen, weekKey]);
-
-  useEffect(() => {
-    if (isSunday() && !hasReviewedThisWeek()) {
-      setGoals(getSavedGoals(weekKey));
-      setOpen(true);
-    }
-  }, [weekKey]);
+  const isOpen = triggerOpen || autoOpen;
 
   const handleClose = () => {
-    setOpen(false);
+    setAutoOpen(false);
     onClose?.();
   };
 
@@ -90,7 +78,7 @@ export function WeeklyReview({ triggerOpen, onClose }: WeeklyReviewProps) {
     handleClose();
   };
 
-  if (!open) return null;
+  if (!isOpen) return null;
 
   // Compute last week summaries
   const weekTasks = tasks.filter((t) => {
