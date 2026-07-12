@@ -1,9 +1,12 @@
 import {
   Home, Calendar, CheckSquare, DollarSign, Activity,
-  BookOpen, Briefcase, Users, MessageCircle, Settings, LogOut, X,
+  BookOpen, Briefcase, Users, MessageCircle, Download, BarChart2, LogOut, X,
 } from 'lucide-react';
 import { useAppStore, type ViewId } from '../stores/app.store';
 import { useTasksStore } from '../stores/tasks.store';
+import { useEventsStore } from '../stores/events.store';
+import { useFinanceStore } from '../stores/finance.store';
+import { useHealthStore } from '../stores/health.store';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { useAuth } from '../../contexts/useAuth';
 
@@ -30,11 +33,42 @@ const NAV: { id: ViewId; label: string; Icon: React.ComponentType<{ size?: numbe
 
 export { NAV };
 
-export function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean; onClose?: () => void }) {
+export function Sidebar({
+  mobileOpen, onClose, onWeeklyReview,
+}: {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+  onWeeklyReview?: () => void;
+}) {
   const { view, setView, chatOpen, toggleChat } = useAppStore();
   const { items: tasks } = useTasksStore();
+  const events = useEventsStore((s) => s.items);
+  const transactions = useFinanceStore((s) => s.items);
+  const { items: workouts, sleepLogs, weightLogs, waterLogs, stepsLogs, moodLogs } = useHealthStore();
   const { isMobile } = useWindowSize();
   const { logout } = useAuth();
+
+  const handleExport = () => {
+    const data = {
+      exportedAt: new Date().toISOString(),
+      tasks,
+      events,
+      transactions,
+      workouts,
+      sleepLogs,
+      weightLogs,
+      waterLogs,
+      stepsLogs,
+      moodLogs,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `node-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const urgentCount = tasks.filter((t) => !t.done && (t.priority === 'urgent' || t.priority === 'high')).length;
 
@@ -146,12 +180,21 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean; onClose
               background: C.teal, boxShadow: `0 0 6px ${C.teal}`,
             }} />
           </button>
-          <button style={{
+          <button onClick={onWeeklyReview} style={{
             display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px',
             borderRadius: 8, color: C.t1, fontSize: 13.5, fontFamily: font,
+            width: '100%', textAlign: 'left',
           }}>
-            <Settings size={14} color={C.t1} />
-            설정
+            <BarChart2 size={14} color={C.t1} />
+            주간 리뷰
+          </button>
+          <button onClick={handleExport} style={{
+            display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px',
+            borderRadius: 8, color: C.t1, fontSize: 13.5, fontFamily: font,
+            width: '100%', textAlign: 'left',
+          }}>
+            <Download size={14} color={C.t1} />
+            데이터 내보내기
           </button>
           <button onClick={logout} style={{
             display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px',

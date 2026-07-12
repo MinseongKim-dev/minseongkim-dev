@@ -40,12 +40,22 @@ export interface StepsLog {
   steps: number;
 }
 
+export type MoodLevel = 1 | 2 | 3 | 4 | 5;
+
+export interface MoodLog {
+  id: string;
+  date: string;
+  mood: MoodLevel;
+  notes?: string;
+}
+
 interface HealthStore {
   items: Workout[];
   sleepLogs: SleepLog[];
   weightLogs: WeightLog[];
   waterLogs: WaterLog[];
   stepsLogs: StepsLog[];
+  moodLogs: MoodLog[];
   loading: boolean;
   fetch: () => Promise<void>;
   add: (data: Omit<Workout, 'id'>) => Promise<void>;
@@ -58,6 +68,8 @@ interface HealthStore {
   removeWaterLog: (id: string) => Promise<void>;
   addStepsLog: (data: Omit<StepsLog, 'id'>) => Promise<void>;
   removeStepsLog: (id: string) => Promise<void>;
+  addMoodLog: (data: Omit<MoodLog, 'id'>) => Promise<void>;
+  removeMoodLog: (id: string) => Promise<void>;
 }
 
 export const useHealthStore = create<HealthStore>((set) => ({
@@ -66,17 +78,19 @@ export const useHealthStore = create<HealthStore>((set) => ({
   weightLogs: [],
   waterLogs: [],
   stepsLogs: [],
+  moodLogs: [],
   loading: false,
 
   fetch: async () => {
     set({ loading: true });
     try {
-      const [items, sleepLogs, weightLogs, waterLogs, stepsLogs] = await Promise.all([
+      const [items, sleepLogs, weightLogs, waterLogs, stepsLogs, moodLogs] = await Promise.all([
         api.get<Workout[]>('/workouts'),
         api.get<SleepLog[]>('/sleep').catch(() => []),
         api.get<WeightLog[]>('/weight').catch(() => []),
         api.get<WaterLog[]>('/water').catch(() => []),
         api.get<StepsLog[]>('/steps').catch(() => []),
+        api.get<MoodLog[]>('/mood').catch(() => []),
       ]);
       set({
         items: items ?? [],
@@ -84,6 +98,7 @@ export const useHealthStore = create<HealthStore>((set) => ({
         weightLogs: (weightLogs ?? []).sort((a, b) => a.date.localeCompare(b.date)),
         waterLogs: waterLogs ?? [],
         stepsLogs: stepsLogs ?? [],
+        moodLogs: (moodLogs ?? []).sort((a, b) => a.date.localeCompare(b.date)),
       });
     } catch (err) {
       useToastStore.getState().add(err instanceof Error ? err.message : '건강 데이터를 불러오지 못했습니다');
@@ -173,6 +188,25 @@ export const useHealthStore = create<HealthStore>((set) => ({
   removeStepsLog: async (id) => {
     set((s) => ({ stepsLogs: s.stepsLogs.filter((s2) => s2.id !== id) }));
     await api.delete<unknown>(`/steps/${id}`).catch((err) => {
+      useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
+    });
+  },
+
+  addMoodLog: async (data) => {
+    try {
+      const item = await api.post<MoodLog>('/mood', data);
+      set((s) => ({
+        moodLogs: [...s.moodLogs, item].sort((a, b) => a.date.localeCompare(b.date)),
+      }));
+    } catch (err) {
+      useToastStore.getState().add(err instanceof Error ? err.message : '기분 기록 추가에 실패했습니다');
+      throw err;
+    }
+  },
+
+  removeMoodLog: async (id) => {
+    set((s) => ({ moodLogs: s.moodLogs.filter((m) => m.id !== id) }));
+    await api.delete<unknown>(`/mood/${id}`).catch((err) => {
       useToastStore.getState().add(err instanceof Error ? err.message : '삭제에 실패했습니다');
     });
   },

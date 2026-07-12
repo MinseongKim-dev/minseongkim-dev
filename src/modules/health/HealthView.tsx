@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Flame, Clock, Activity, Moon, BarChart2, Star, Droplets, Footprints, Scale } from 'lucide-react';
-import { useHealthStore, type SleepLog } from '../../shared/stores/health.store';
+import { Plus, Trash2, Flame, Clock, Activity, Moon, BarChart2, Star, Droplets, Footprints, Scale, Smile } from 'lucide-react';
+import { useHealthStore, type SleepLog, type MoodLevel } from '../../shared/stores/health.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 
@@ -232,9 +232,9 @@ function DashboardTab() {
 
 // ─── Main View ────────────────────────────────────────────────────────────────
 export function HealthView() {
-  const { items, sleepLogs, weightLogs, waterLogs, stepsLogs, loading, add, remove, addSleepLog, removeSleepLog, addWeightLog, removeWeightLog, addWaterLog, addStepsLog, fetch } = useHealthStore();
+  const { items, sleepLogs, weightLogs, waterLogs, stepsLogs, moodLogs, loading, add, remove, addSleepLog, removeSleepLog, addWeightLog, removeWeightLog, addWaterLog, addStepsLog, addMoodLog, removeMoodLog, fetch } = useHealthStore();
   const { isMobile } = useWindowSize();
-  const [tab, setTab] = useState<'workout' | 'sleep' | 'dashboard' | 'body'>('dashboard');
+  const [tab, setTab] = useState<'workout' | 'sleep' | 'dashboard' | 'body' | 'mood'>('dashboard');
 
   // Workout form
   const [showWorkoutForm, setShowWorkoutForm] = useState(false);
@@ -377,11 +377,41 @@ export function HealthView() {
   const bmiLabel = bmi == null ? '' : bmi < 18.5 ? '저체중' : bmi < 23 ? '정상' : bmi < 25 ? '과체중' : '비만';
   const bmiColor = bmi == null ? C.t1 : bmi < 18.5 ? C.sky : bmi < 23 ? C.teal : bmi < 25 ? C.amber : C.rose;
   const weightChartData = weightLogs.slice(-14).map((w) => ({ date: w.date.slice(5), kg: w.weight }));
+
+  // Mood state
+  const [selectedMood, setSelectedMood] = useState<MoodLevel>(3);
+  const [moodNotes, setMoodNotes] = useState('');
+  const [moodDate, setMoodDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const MOOD_EMOJI: Record<MoodLevel, string> = { 1: '😢', 2: '😕', 3: '😐', 4: '😊', 5: '😄' };
+  const MOOD_LABEL: Record<MoodLevel, string> = { 1: '매우 나쁨', 2: '나쁨', 3: '보통', 4: '좋음', 5: '매우 좋음' };
+  const MOOD_COLOR: Record<MoodLevel, string> = { 1: C.rose, 2: C.amber, 3: C.t1, 4: C.sky, 5: C.teal };
+
+  // Monthly heatmap: current month days → mood value
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const firstDow = new Date(monthStart + 'T12:00:00').getDay(); // 0=Sun
+
+  const moodByDate = new Map(moodLogs.map((m) => [m.date, m]));
+
+  // avg mood for summary
+  const recentMoods = moodLogs.slice(-7);
+  const avgMood = recentMoods.length > 0
+    ? +(recentMoods.reduce((s, m) => s + m.mood, 0) / recentMoods.length).toFixed(1)
+    : null;
+
+  const handleAddMood = async () => {
+    await addMoodLog({ date: moodDate, mood: selectedMood, notes: moodNotes || undefined });
+    setMoodNotes('');
+  };
+
   const tabs = [
     { id: 'dashboard' as const, label: '대시보드', icon: BarChart2, color: C.blue },
     { id: 'workout' as const, label: '운동', icon: Activity, color: C.teal },
     { id: 'sleep' as const, label: '수면', icon: Moon, color: C.violet },
     { id: 'body' as const, label: '신체', icon: Scale, color: C.sky },
+    { id: 'mood' as const, label: '기분', icon: Smile, color: C.rose },
   ];
 
   return (
@@ -619,6 +649,103 @@ export function HealthView() {
             </div>
           </div>
         )}
+
+        {tab === 'mood' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              {[
+                { label: '7일 평균 기분', value: avgMood ? `${MOOD_EMOJI[Math.round(avgMood) as MoodLevel]} ${avgMood}` : '—', color: C.rose },
+                { label: '총 기록 일수', value: `${moodLogs.length}일`, color: C.sky },
+                { label: '오늘 기분', value: moodByDate.get(todayStr) ? MOOD_EMOJI[moodByDate.get(todayStr)!.mood] : '—', color: C.teal },
+              ].map((s) => (
+                <div key={s.label} style={{ background: C.bg2, border: `1px solid ${s.color}30`, borderRadius: 12, padding: '14px 16px' }}>
+                  <p style={{ color: C.t1, fontSize: 11, marginBottom: 6 }}>{s.label}</p>
+                  <p style={{ color: s.color, fontSize: 22, fontWeight: 700, fontFamily: mono }}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Monthly heatmap */}
+            <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '16px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                <Smile size={13} color={C.rose} />
+                <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>
+                  {now.getFullYear()}년 {now.getMonth() + 1}월 기분 달력
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
+                  <div key={d} style={{ textAlign: 'center', fontSize: 10, color: C.t1, paddingBottom: 4 }}>{d}</div>
+                ))}
+                {Array.from({ length: firstDow }, (_, i) => <div key={`e-${i}`} />)}
+                {Array.from({ length: daysInMonth }, (_, i) => {
+                  const dayNum = i + 1;
+                  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                  const log = moodByDate.get(dateStr);
+                  const isFuture = dateStr > todayStr;
+                  return (
+                    <div key={dateStr} title={log ? `${MOOD_LABEL[log.mood]}` : undefined} style={{
+                      aspectRatio: '1', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: log ? 16 : 11, fontFamily: mono,
+                      background: log ? `${MOOD_COLOR[log.mood]}25` : C.b0,
+                      border: `1px solid ${log ? MOOD_COLOR[log.mood] + '60' : dateStr === todayStr ? C.rose + '60' : 'transparent'}`,
+                      color: isFuture ? C.t2 : log ? MOOD_COLOR[log.mood] : C.t2,
+                      cursor: isFuture ? 'default' : 'pointer',
+                    }}>
+                      {log ? MOOD_EMOJI[log.mood] : dayNum}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 12, marginTop: 12, justifyContent: 'center' }}>
+                {([1, 2, 3, 4, 5] as MoodLevel[]).map((m) => (
+                  <span key={m} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: MOOD_COLOR[m] }}>
+                    {MOOD_EMOJI[m]} <span>{MOOD_LABEL[m]}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Mobile: mood form */}
+            {isMobile && (
+              <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '16px' }}>
+                <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', marginBottom: 12 }}>오늘 기분 기록</p>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12, justifyContent: 'space-between' }}>
+                  {([1, 2, 3, 4, 5] as MoodLevel[]).map((m) => (
+                    <button key={m} onClick={() => setSelectedMood(m)} style={{
+                      flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 22, cursor: 'pointer',
+                      background: selectedMood === m ? `${MOOD_COLOR[m]}25` : C.bg3,
+                      border: `1px solid ${selectedMood === m ? MOOD_COLOR[m] : C.b1}`,
+                    }}>{MOOD_EMOJI[m]}</button>
+                  ))}
+                </div>
+                <input value={moodNotes} onChange={(e) => setMoodNotes(e.target.value)} placeholder="메모 (선택)"
+                  style={{ width: '100%', background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none', boxSizing: 'border-box', marginBottom: 10 }} />
+                <button onClick={() => void handleAddMood()} style={{ width: '100%', padding: '9px', background: C.rose, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: font, cursor: 'pointer' }}>기록 추가</button>
+              </div>
+            )}
+
+            {/* Recent mood log */}
+            <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.b0}` }}>
+                <span style={{ color: C.t0, fontSize: 13, fontWeight: 600 }}>최근 기분 기록</span>
+              </div>
+              {moodLogs.length === 0 && <div style={{ padding: '20px 16px', color: C.t1, fontSize: 13, textAlign: 'center' }}>기록이 없습니다</div>}
+              {[...moodLogs].reverse().slice(0, 14).map((m) => (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderTop: `1px solid ${C.b0}` }}>
+                  <span style={{ fontSize: 20 }}>{MOOD_EMOJI[m.mood]}</span>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ color: MOOD_COLOR[m.mood], fontSize: 13, fontWeight: 600 }}>{MOOD_LABEL[m.mood]}</span>
+                    {m.notes && <p style={{ color: C.t1, fontSize: 11, marginTop: 2 }}>{m.notes}</p>}
+                  </div>
+                  <span style={{ color: C.t1, fontSize: 11, fontFamily: mono }}>{m.date}</span>
+                  <button onClick={() => void removeMoodLog(m.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex' }}><Trash2 size={12} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Right panel: desktop only ── */}
@@ -644,6 +771,23 @@ export function HealthView() {
                   <Scale size={14} color={C.sky} />
                   <span style={{ color: C.sky, fontSize: 13, fontWeight: 600 }}>신체 지표 기록</span>
                 </button>
+                <button onClick={() => setTab('mood')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: `${C.rose}10`, border: `1px solid ${C.rose}30`, borderRadius: 10, cursor: 'pointer', fontFamily: font }}>
+                  <Smile size={14} color={C.rose} />
+                  <span style={{ color: C.rose, fontSize: 13, fontWeight: 600 }}>기분 기록하기</span>
+                </button>
+              </div>
+              <div style={{ marginTop: 14, borderTop: `1px solid ${C.b0}`, paddingTop: 12 }}>
+                <p style={{ color: C.t1, fontSize: 10, marginBottom: 8 }}>오늘 기분 빠른 기록</p>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {([1, 2, 3, 4, 5] as MoodLevel[]).map((m) => (
+                    <button key={m} onClick={() => void addMoodLog({ date: todayStr, mood: m })} title={MOOD_LABEL[m]} style={{
+                      flex: 1, padding: '7px 0', borderRadius: 7, fontSize: 17, cursor: 'pointer',
+                      background: moodByDate.get(todayStr)?.mood === m ? `${MOOD_COLOR[m]}25` : C.bg3,
+                      border: `1px solid ${moodByDate.get(todayStr)?.mood === m ? MOOD_COLOR[m] : C.b1}`,
+                    }}>{MOOD_EMOJI[m]}</button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -680,6 +824,29 @@ export function HealthView() {
               {SleepForm}
             </div>
           )}
+
+          {tab === 'mood' && (
+            <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '16px' }}>
+              <p style={{ color: C.rose, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>기분 기록</p>
+              <p style={{ color: C.t1, fontSize: 11, marginBottom: 8 }}>날짜</p>
+              <input type="date" value={moodDate} onChange={(e) => setMoodDate(e.target.value)}
+                style={{ width: '100%', background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 10px', color: C.t0, fontSize: 13, fontFamily: font, colorScheme: 'dark', boxSizing: 'border-box', marginBottom: 12 }} />
+              <p style={{ color: C.t1, fontSize: 11, marginBottom: 8 }}>오늘 기분 — {MOOD_LABEL[selectedMood]}</p>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                {([1, 2, 3, 4, 5] as MoodLevel[]).map((m) => (
+                  <button key={m} onClick={() => setSelectedMood(m)} style={{
+                    flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 20, cursor: 'pointer',
+                    background: selectedMood === m ? `${MOOD_COLOR[m]}25` : C.bg3,
+                    border: `1px solid ${selectedMood === m ? MOOD_COLOR[m] : C.b1}`,
+                  }}>{MOOD_EMOJI[m]}</button>
+                ))}
+              </div>
+              <input value={moodNotes} onChange={(e) => setMoodNotes(e.target.value)} placeholder="메모 (선택)"
+                style={{ width: '100%', background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: C.t0, fontSize: 13, fontFamily: font, outline: 'none', boxSizing: 'border-box', marginBottom: 10 }} />
+              <button onClick={() => void handleAddMood()} style={{ width: '100%', padding: '9px', background: C.rose, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: font, cursor: 'pointer' }}>기록 추가</button>
+            </div>
+          )}
+
         </div>
       )}
     </div>
