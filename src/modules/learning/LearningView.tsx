@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, BookOpen, Target, Clock } from 'lucide-react';
+import { Plus, Trash2, BookOpen, Target, Clock, Layers, RotateCcw } from 'lucide-react';
 import { useLearningStore, type BookStatus } from '../../shared/stores/learning.store';
 import { useWindowSize } from '../../shared/hooks/useWindowSize';
 
@@ -38,10 +38,26 @@ function fmtMins(mins: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+const QUALITY_BUTTONS: { label: string; quality: number; color: string }[] = [
+  { label: '다시', quality: 1, color: '#F05472' },
+  { label: '어려움', quality: 3, color: '#EFA020' },
+  { label: '잘 알아요', quality: 4, color: '#58AEFF' },
+  { label: '완벽', quality: 5, color: '#00CCA0' },
+];
+
 export function LearningView() {
-  const { goals, books, studyLogs, loading, fetch, addGoal, updateGoal, removeGoal, addBook, removeBook, addStudyLog, removeStudyLog } = useLearningStore();
+  const { goals, books, studyLogs, flashcards, loading, fetch, addGoal, updateGoal, removeGoal, addBook, removeBook, addStudyLog, removeStudyLog, addFlashcard, reviewFlashcard, removeFlashcard } = useLearningStore();
   const { isMobile } = useWindowSize();
-  const [tab, setTab] = useState<'goals' | 'books' | 'study'>('goals');
+  const [tab, setTab] = useState<'goals' | 'books' | 'study' | 'flashcard'>('goals');
+
+  // Flashcard state
+  const [cardFront, setCardFront] = useState('');
+  const [cardBack, setCardBack] = useState('');
+  const [cardCategory, setCardCategory] = useState('');
+  const [showCardForm, setShowCardForm] = useState(false);
+  const [studyMode, setStudyMode] = useState(false);
+  const [studyIndex, setStudyIndex] = useState(0);
+  const [revealed, setRevealed] = useState(false);
 
   // Goal form
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -99,6 +115,48 @@ export function LearningView() {
     if (isMobile) setShowStudyForm(false);
   };
 
+  const todayForCards = new Date().toISOString().split('T')[0];
+  const dueCards = flashcards.filter((c) => c.nextReview <= todayForCards);
+  const masteredCards = flashcards.filter((c) => c.interval > 21);
+  const studyQueue = [...dueCards];
+  const activeStudyCard = studyQueue[studyIndex] ?? null;
+
+  const handleAddFlashcard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cardFront.trim() || !cardBack.trim()) return;
+    await addFlashcard({ front: cardFront.trim(), back: cardBack.trim(), category: cardCategory || undefined });
+    setCardFront(''); setCardBack(''); setCardCategory('');
+    if (isMobile) setShowCardForm(false);
+  };
+
+  const handleReview = async (quality: number) => {
+    if (!activeStudyCard) return;
+    await reviewFlashcard(activeStudyCard.id, quality);
+    setRevealed(false);
+    if (studyIndex + 1 >= studyQueue.length) {
+      setStudyMode(false);
+      setStudyIndex(0);
+    } else {
+      setStudyIndex((i) => i + 1);
+    }
+  };
+
+  const FlashcardForm = (
+    <form onSubmit={handleAddFlashcard} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <textarea value={cardFront} onChange={(e) => setCardFront(e.target.value)} placeholder="앞면 (질문)" rows={2}
+        style={{ ...inputStyle, resize: 'vertical', minHeight: 56 }} />
+      <textarea value={cardBack} onChange={(e) => setCardBack(e.target.value)} placeholder="뒷면 (정답)" rows={2}
+        style={{ ...inputStyle, resize: 'vertical', minHeight: 56 }} />
+      <input value={cardCategory} onChange={(e) => setCardCategory(e.target.value)} placeholder="카테고리 (선택)" style={inputStyle} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="submit" style={{ flex: 1, padding: '9px', background: C.violet, color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: font, cursor: 'pointer' }}>추가</button>
+        {isMobile && (
+          <button type="button" onClick={() => setShowCardForm(false)} style={{ padding: '9px 16px', background: C.bg1, border: `1px solid ${C.b1}`, color: C.t1, borderRadius: 8, fontSize: 13, fontFamily: font, cursor: 'pointer' }}>취소</button>
+        )}
+      </div>
+    </form>
+  );
+
   const GoalForm = (
     <form onSubmit={handleAddGoal} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <input value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} placeholder="학습 목표 제목" style={inputStyle} />
@@ -153,21 +211,26 @@ export function LearningView() {
     </form>
   );
 
-  const tabBtn = (id: 'goals' | 'books' | 'study', label: string) => (
-    <button
-      onClick={() => setTab(id)}
-      style={{
-        padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-        fontFamily: font, cursor: 'pointer',
-        background: tab === id ? `${C.sky}18` : 'transparent',
-        border: `1px solid ${tab === id ? C.sky : C.b1}`,
-        color: tab === id ? C.sky : C.t1,
-      }}
-    >{label}</button>
-  );
+  const TAB_COLORS: Record<string, string> = { goals: C.sky, books: C.blue, study: C.teal, flashcard: C.violet };
 
-  const rightAccent = tab === 'goals' ? C.sky : tab === 'books' ? C.blue : C.teal;
-  const rightLabel = tab === 'goals' ? '새 목표' : tab === 'books' ? '책 추가' : '학습 기록';
+  const tabBtn = (id: 'goals' | 'books' | 'study' | 'flashcard', label: string) => {
+    const color = TAB_COLORS[id];
+    return (
+      <button
+        onClick={() => setTab(id)}
+        style={{
+          padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+          fontFamily: font, cursor: 'pointer',
+          background: tab === id ? `${color}18` : 'transparent',
+          border: `1px solid ${tab === id ? color : C.b1}`,
+          color: tab === id ? color : C.t1,
+        }}
+      >{label}</button>
+    );
+  };
+
+  const rightAccent = TAB_COLORS[tab] ?? C.sky;
+  const rightLabel = tab === 'goals' ? '새 목표' : tab === 'books' ? '책 추가' : tab === 'study' ? '학습 기록' : '새 카드';
 
   return (
     <div style={{ fontFamily: font, display: 'flex', gap: 20, alignItems: 'flex-start' }}>
@@ -181,10 +244,11 @@ export function LearningView() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           {tabBtn('goals', '학습 목표')}
           {tabBtn('books', '독서')}
           {tabBtn('study', '학습 기록')}
+          {tabBtn('flashcard', `플래시카드${dueCards.length > 0 ? ` (${dueCards.length})` : ''}`)}
         </div>
 
         {/* Goals tab */}
@@ -316,6 +380,138 @@ export function LearningView() {
             )}
           </>
         )}
+        {/* Flashcard tab */}
+        {tab === 'flashcard' && (
+          <>
+            {/* Study mode */}
+            {studyMode && activeStudyCard ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                  <span style={{ color: C.t1, fontSize: 12 }}>{studyIndex + 1} / {studyQueue.length}</span>
+                  <button onClick={() => { setStudyMode(false); setStudyIndex(0); setRevealed(false); }}
+                    style={{ marginLeft: 'auto', color: C.t1, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                    <RotateCcw size={11} />종료
+                  </button>
+                </div>
+
+                {/* Card face */}
+                <div
+                  onClick={() => setRevealed(true)}
+                  style={{
+                    background: C.bg2, border: `1px solid ${revealed ? C.violet : C.b1}`,
+                    borderRadius: 16, padding: '32px 24px', minHeight: 180,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    cursor: revealed ? 'default' : 'pointer', textAlign: 'center', gap: 16,
+                    transition: 'border-color 0.2s',
+                  }}
+                >
+                  {activeStudyCard.category && (
+                    <span style={{ fontSize: 10, color: C.violet, background: `${C.violet}18`, borderRadius: 5, padding: '2px 8px' }}>
+                      {activeStudyCard.category}
+                    </span>
+                  )}
+                  <p style={{ color: C.t0, fontSize: 15, lineHeight: 1.5 }}>{activeStudyCard.front}</p>
+                  {!revealed && (
+                    <p style={{ color: C.t2, fontSize: 12 }}>클릭하여 정답 보기</p>
+                  )}
+                  {revealed && (
+                    <>
+                      <div style={{ width: '100%', height: 1, background: C.b1 }} />
+                      <p style={{ color: C.teal, fontSize: 15, lineHeight: 1.5 }}>{activeStudyCard.back}</p>
+                    </>
+                  )}
+                </div>
+
+                {revealed && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                    {QUALITY_BUTTONS.map(({ label, quality, color }) => (
+                      <button
+                        key={label}
+                        onClick={() => handleReview(quality)}
+                        style={{
+                          padding: '10px 4px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                          fontFamily: font, cursor: 'pointer',
+                          background: `${color}18`, border: `1px solid ${color}50`, color,
+                        }}
+                      >{label}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Summary row */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+                  {[
+                    { label: '전체', value: flashcards.length, color: C.violet },
+                    { label: '오늘 복습', value: dueCards.length, color: '#EFA020' },
+                    { label: '마스터', value: masteredCards.length, color: C.teal },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '12px 14px', textAlign: 'center' }}>
+                      <p style={{ color, fontSize: 20, fontWeight: 700, fontFamily: mono }}>{value}</p>
+                      <p style={{ color: C.t1, fontSize: 11, marginTop: 2 }}>{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Start study button */}
+                {dueCards.length > 0 && (
+                  <button
+                    onClick={() => { setStudyMode(true); setStudyIndex(0); setRevealed(false); }}
+                    style={{
+                      width: '100%', padding: '14px', borderRadius: 12, marginBottom: 16,
+                      background: `linear-gradient(135deg, ${C.violet}, #9B7CF5)`,
+                      color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: font, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    <Layers size={15} />
+                    복습 시작 ({dueCards.length}장)
+                  </button>
+                )}
+
+                {/* Card list */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                  {flashcards.map((card) => {
+                    const isDue = card.nextReview <= todayForCards;
+                    return (
+                      <div key={card.id} style={{ background: C.bg2, border: `1px solid ${isDue ? `${C.violet}40` : C.b0}`, borderRadius: 10, padding: '12px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ color: C.t0, fontSize: 13 }}>{card.front}</p>
+                            <p style={{ color: C.t1, fontSize: 11.5, marginTop: 4 }}>{card.back}</p>
+                          </div>
+                          <button onClick={() => removeFlashcard(card.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex', flexShrink: 0 }}>
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                          {card.category && (
+                            <span style={{ fontSize: 10, color: C.violet, background: `${C.violet}18`, borderRadius: 5, padding: '1px 6px' }}>{card.category}</span>
+                          )}
+                          <span style={{ fontSize: 10, fontFamily: mono, color: isDue ? C.amber : C.t2, marginLeft: 'auto' }}>
+                            {isDue ? '복습 필요' : `다음 복습: ${card.nextReview}`}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {flashcards.length === 0 && !loading && (
+                    <p style={{ color: C.t2, fontSize: 13, padding: '20px 0' }}>플래시카드가 없습니다. 새 카드를 추가해보세요.</p>
+                  )}
+                </div>
+
+                {isMobile && (
+                  showCardForm ? FlashcardForm : (
+                    <button onClick={() => setShowCardForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, color: C.t1, fontSize: 13, fontFamily: font, cursor: 'pointer', padding: '8px 0' }}>
+                      <Plus size={14} />새 카드 추가
+                    </button>
+                  )
+                )}
+              </>
+            )}
+          </>
+        )}
       </div>
 
       {/* ── Right panel: desktop only ── */}
@@ -348,6 +544,7 @@ export function LearningView() {
             {tab === 'goals' && GoalForm}
             {tab === 'books' && BookForm}
             {tab === 'study' && StudyForm}
+            {tab === 'flashcard' && FlashcardForm}
           </div>
         </div>
       )}
