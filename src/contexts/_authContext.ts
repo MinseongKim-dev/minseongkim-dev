@@ -1,8 +1,8 @@
 import { createContext } from 'react';
-import type { AuthUser } from 'aws-amplify/auth';
+import type { User } from '@supabase/supabase-js';
 
 export interface AuthContextValue {
-  user: AuthUser | null;
+  user: User | null;
   isLoading: boolean;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
