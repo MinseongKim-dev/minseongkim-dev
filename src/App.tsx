@@ -6,6 +6,7 @@ import { BottomNav } from './shared/layout/BottomNav';
 import { ChatPanel } from './shared/ui/ChatPanel';
 import { ToastContainer } from './shared/ui/ToastContainer';
 import { QuickCapture } from './shared/components/QuickCapture';
+import { WeeklyReview } from './shared/components/WeeklyReview';
 import { useAppStore } from './shared/stores/app.store';
 import { useWindowSize } from './shared/hooks/useWindowSize';
 
@@ -22,12 +23,14 @@ function NodeApp() {
   const { view, chatOpen } = useAppStore();
   const { isMobile } = useWindowSize();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [weeklyReviewOpen, setWeeklyReviewOpen] = useState(false);
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#06091A', overflow: 'hidden' }}>
       <Sidebar
         mobileOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
+        onWeeklyReview={() => { setWeeklyReviewOpen(true); if (isMobile) setMobileMenuOpen(false); }}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Header onMenuClick={() => setMobileMenuOpen(true)} />
@@ -56,6 +59,10 @@ function NodeApp() {
       )}
       <ToastContainer />
       <QuickCapture />
+      <WeeklyReview
+        triggerOpen={weeklyReviewOpen}
+        onClose={() => setWeeklyReviewOpen(false)}
+      />
     </div>
   );
 }
