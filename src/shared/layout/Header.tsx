@@ -17,7 +17,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const { user } = useAuth();
   const { isMobile } = useWindowSize();
   const domain = NAV.find((n) => n.id === view);
-  const email = user?.email ?? '';
+  const email = user?.signInDetails?.loginId ?? '';
   const avatarLetter = (email.charAt(0) || 'N').toUpperCase();
 
   return (
