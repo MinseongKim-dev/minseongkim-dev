@@ -6,8 +6,8 @@ on:
       - main
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  STACK_NAME: node-app-dev
+  AWS_REGION: ap-northeast-2
+  STACK_NAME: node-backend-dev
 
 jobs:
   detect-changes:
@@ -28,7 +28,6 @@ jobs:
           filters: |
             backend:
               - 'backend/**'
-              - 'infrastructure/**'
             frontend:
               - 'src/**'
               - 'public/**'
@@ -47,78 +46,41 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-2
+          aws-region: ${{ env.AWS_REGION }}
 
-      - uses: actions/setup-python@v5
+      - uses: aws-actions/setup-sam@v2
         with:
-          python-version: '3.12'
-
-      - name: Install AWS SAM CLI
-        run: pip install aws-sam-cli
+          use-installer: true
 
       - name: Run backend tests
         working-directory: backend
         run: |
           pip install -r requirements-dev.txt
-          pytest tests/ || true
+          pytest tests/ -q || true
 
-      - name: SAM Build
-        working-directory: infrastructure
-        run: sam build
+      - name: SAM build
+        working-directory: backend
+        run: sam build --cached --parallel
 
-      - name: Get current CloudFront URL (for AllowedOrigin)
-        id: get_cf_url
+      - name: SAM deploy
+        working-directory: backend
         run: |
-          CF_URL=$(aws cloudformation describe-stacks \
+          sam deploy \
             --stack-name ${{ env.STACK_NAME }} \
-            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
-            --output text 2>/dev/null) || true
-          if [ -z "$CF_URL" ] || [ "$CF_URL" = "None" ]; then
-            CF_URL="*"
-          fi
-          echo "cf_url=$CF_URL" >> $GITHUB_OUTPUT
-
-      - name: SAM Deploy
-        working-directory: infrastructure
-        run: |
-          DOMAIN_PARAM="${{ secrets.DOMAIN_NAME }}"
-          CERT_PARAM="${{ secrets.ACM_CERTIFICATE_ARN }}"
-          sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
+            --s3-bucket ${{ secrets.SAM_ARTIFACTS_BUCKET }} \
+            --capabilities CAPABILITY_IAM \
+            --region ${{ env.AWS_REGION }} \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
             --parameter-overrides \
-              "Environment=dev" \
-              "AllowedOrigin=${{ steps.get_cf_url.outputs.cf_url }}" \
-              "DomainName=${DOMAIN_PARAM}" \
-              "AcmCertificateArn=${CERT_PARAM}"
-
-      - name: Update CORS to CloudFront URL (post-deploy)
-        run: |
-          # After deploy the CloudFront distribution definitely exists — lock down CORS
-          CF_URL=$(aws cloudformation describe-stacks \
-            --stack-name ${{ env.STACK_NAME }} \
-            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
-            --output text)
-          PREV_URL="${{ steps.get_cf_url.outputs.cf_url }}"
-          DOMAIN_PARAM="${{ secrets.DOMAIN_NAME }}"
-          CERT_PARAM="${{ secrets.ACM_CERTIFICATE_ARN }}"
-          if [ "$CF_URL" != "$PREV_URL" ] && [ -n "$CF_URL" ] && [ "$CF_URL" != "None" ]; then
-            echo "Updating AllowedOrigin from '$PREV_URL' to '$CF_URL'"
-            cd infrastructure
-            sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
-              --parameter-overrides \
-                "Environment=dev" \
-                "AllowedOrigin=$CF_URL" \
-                "DomainName=${DOMAIN_PARAM}" \
-                "AcmCertificateArn=${CERT_PARAM}"
-          else
-            echo "AllowedOrigin already correct: $CF_URL"
-          fi
+              Stage=dev \
+              SesFromEmail=${{ secrets.SES_FROM_EMAIL }}
 
   deploy-frontend:
-    # Wait for deploy-backend when it runs; skip if backend failed
     needs: [detect-changes, deploy-backend]
     if: |
       always() &&
@@ -130,11 +92,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: aws-actions/configure-aws-credentials@v5
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-2
+          aws-region: ${{ env.AWS_REGION }}
 
       - uses: actions/setup-node@v5
         with:
@@ -144,7 +106,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Get stack outputs
+      - name: Fetch stack outputs for Vite env
         run: |
           API_URL=$(aws cloudformation describe-stacks \
             --stack-name ${{ env.STACK_NAME }} \
@@ -154,39 +116,44 @@ jobs:
             --stack-name ${{ env.STACK_NAME }} \
             --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" \
             --output text)
-          USER_POOL_CLIENT_ID=$(aws cloudformation describe-stacks \
+          CLIENT_ID=$(aws cloudformation describe-stacks \
             --stack-name ${{ env.STACK_NAME }} \
             --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" \
             --output text)
           echo "VITE_API_URL=$API_URL" >> $GITHUB_ENV
           echo "VITE_COGNITO_USER_POOL_ID=$USER_POOL_ID" >> $GITHUB_ENV
-          echo "VITE_COGNITO_CLIENT_ID=$USER_POOL_CLIENT_ID" >> $GITHUB_ENV
-          echo "VITE_AWS_REGION=ap-northeast-2" >> $GITHUB_ENV
+          echo "VITE_COGNITO_CLIENT_ID=$CLIENT_ID" >> $GITHUB_ENV
+          echo "VITE_AWS_REGION=${{ env.AWS_REGION }}" >> $GITHUB_ENV
 
       - name: Build
         run: npm run build
 
-      - name: Get S3 bucket name
+      - name: Fetch S3 bucket name and CloudFront ID
         run: |
           BUCKET=$(aws cloudformation describe-stacks \
             --stack-name ${{ env.STACK_NAME }} \
             --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" \
             --output text)
-          echo "BUCKET=$BUCKET" >> $GITHUB_ENV
-
-      - name: Get CloudFront distribution ID
-        run: |
           CF_ID=$(aws cloudformation describe-stack-resource \
             --stack-name ${{ env.STACK_NAME }} \
             --logical-resource-id CloudFrontDistribution \
             --query "StackResourceDetail.PhysicalResourceId" \
             --output text)
+          echo "BUCKET=$BUCKET" >> $GITHUB_ENV
           echo "CF_ID=$CF_ID" >> $GITHUB_ENV
 
       - name: Sync to S3
-        run: aws s3 sync dist/ s3://${{ env.BUCKET }} --delete
+        run: |
+          # Long-lived assets (hashed filenames) — cache aggressively
+          aws s3 sync dist/ s3://${{ env.BUCKET }}/ \
+            --delete \
+            --exclude "index.html" \
+            --cache-control "public,max-age=31536000,immutable"
+          # index.html must never be cached (SPA entry point)
+          aws s3 cp dist/index.html s3://${{ env.BUCKET }}/index.html \
+            --cache-control "no-cache,no-store,must-revalidate"
 
-      - name: Invalidate CloudFront cache
+      - name: Invalidate CloudFront
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ env.CF_ID }} \

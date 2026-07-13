@@ -1,0 +1,474 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Node AI Life Manager — backend infrastructure
+
+# ── Parameters ──────────────────────────────────────────────────────────────
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+
+  BedrockModelId:
+    Type: String
+    # Claude Haiku — cheapest Bedrock model (~$0.25/1M input tokens)
+    Default: 'us.anthropic.claude-haiku-4-5-20251001'
+
+  MonthlyAiBudgetUsd:
+    Type: String
+    Default: '5.0'
+
+  SesFromEmail:
+    Type: String
+    Description: SES-verified sender email (e.g. noreply@yourdomain.com)
+    Default: ''
+
+# ── Globals ──────────────────────────────────────────────────────────────────
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]        # 20 % cheaper than x86
+    MemorySize: 256
+    Timeout: 30
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref MainTable
+        STAGE: !Ref Stage
+
+# ── Resources ────────────────────────────────────────────────────────────────
+Resources:
+
+  # ── DynamoDB (single-table, on-demand = free tier friendly) ─────────────
+  MainTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'node-main-${Stage}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: PK,     AttributeType: S }
+        - { AttributeName: SK,     AttributeType: S }
+        - { AttributeName: GSI1PK, AttributeType: S }
+        - { AttributeName: GSI1SK, AttributeType: S }
+        - { AttributeName: GSI2PK, AttributeType: S }
+        - { AttributeName: GSI2SK, AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-TypeDate
+          KeySchema:
+            - { AttributeName: GSI1PK, KeyType: HASH }
+            - { AttributeName: GSI1SK, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+        - IndexName: GSI2-Custom
+          KeySchema:
+            - { AttributeName: GSI2PK, KeyType: HASH }
+            - { AttributeName: GSI2SK, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  # ── Cognito (free up to 50 K MAUs) ──────────────────────────────────────
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub 'node-users-${Stage}'
+      AutoVerifiedAttributes: [email]
+      UsernameAttributes: [email]
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - { Name: verified_email, Priority: 1 }
+      UserPoolAddOns:
+        AdvancedSecurityMode: OFF   # avoid Advanced Security $0.05/MAU charge
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub 'node-web-${Stage}'
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+
+  # ── API Gateway (HTTP API — cheaper than REST API) ───────────────────────
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      Auth:
+        DefaultAuthorizer: CognitoJwt
+        Authorizers:
+          CognitoJwt:
+            JwtConfiguration:
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}'
+              audience: [!Ref UserPoolClient]
+            IdentitySource: '$request.header.Authorization'
+      CorsConfiguration:
+        AllowOrigins: ['*']
+        AllowHeaders: ['Content-Type', 'Authorization']
+        AllowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+
+  # ── Dead Letter Queue (free tier: 1 M requests/month) ───────────────────
+  LambdaDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'node-dlq-${Stage}'
+      MessageRetentionPeriod: 1209600   # 14 days
+
+  # ── SNS alert topic ──────────────────────────────────────────────────────
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'node-alerts-${Stage}'
+
+  # ── Lambda: CRUD ─────────────────────────────────────────────────────────
+  CrudFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'node-crud-${Stage}'
+      CodeUri: ./
+      Handler: handlers.crud_handler.handler
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt LambdaDLQ.Arn
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MainTable
+      Events:
+        CrudList:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: GET
+            Path: /api/{domain}
+        CrudCreate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: POST
+            Path: /api/{domain}
+        CrudGet:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: GET
+            Path: /api/{domain}/{id}
+        CrudUpdate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: PUT
+            Path: /api/{domain}/{id}
+        CrudDelete:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: DELETE
+            Path: /api/{domain}/{id}
+
+  # ── Lambda: AI Chat ──────────────────────────────────────────────────────
+  AiChatFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'node-ai-chat-${Stage}'
+      CodeUri: ./
+      Handler: handlers.ai_handler.handler
+      Timeout: 60
+      MemorySize: 512
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt LambdaDLQ.Arn
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          BEDROCK_REGION: us-east-1
+          MONTHLY_AI_BUDGET: !Ref MonthlyAiBudgetUsd
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MainTable
+        - Statement:
+            - Effect: Allow
+              Action: bedrock:InvokeModel
+              Resource: !Sub 'arn:aws:bedrock:us-east-1::foundation-model/*'
+      Events:
+        AiChat:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: POST
+            Path: /ai/chat
+
+  # ── Lambda: Career Coach ──────────────────────────────────────────────────
+  CareerCoachFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'node-career-coach-${Stage}'
+      CodeUri: ./
+      Handler: handlers.career_coach_handler.handler
+      Timeout: 60
+      MemorySize: 512
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt LambdaDLQ.Arn
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          BEDROCK_REGION: us-east-1
+          MONTHLY_AI_BUDGET: !Ref MonthlyAiBudgetUsd
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MainTable
+        - Statement:
+            - Effect: Allow
+              Action: bedrock:InvokeModel
+              Resource: !Sub 'arn:aws:bedrock:us-east-1::foundation-model/*'
+      Events:
+        CoachProfile:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: POST
+            Path: /career/coach/profile
+        CoachAssess:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: POST
+            Path: /career/coach/assess
+        CoachPaths:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: POST
+            Path: /career/coach/paths
+        CoachPathSelect:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: POST
+            Path: /career/coach/paths/{pathId}/select
+        CoachCycle:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: POST
+            Path: /career/coach/coaching/{targetId}
+
+  # ── Lambda: Proactive Briefing (EventBridge daily 07:00 KST) ────────────
+  ProactiveFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'node-proactive-${Stage}'
+      CodeUri: ./
+      Handler: handlers.proactive_handler.handler
+      Timeout: 300
+      MemorySize: 512
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt LambdaDLQ.Arn
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          BEDROCK_REGION: us-east-1
+          MONTHLY_AI_BUDGET: !Ref MonthlyAiBudgetUsd
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MainTable
+        - Statement:
+            - Effect: Allow
+              Action: bedrock:InvokeModel
+              Resource: !Sub 'arn:aws:bedrock:us-east-1::foundation-model/*'
+      Events:
+        DailyBriefing:
+          Type: Schedule
+          Properties:
+            Schedule: 'cron(0 22 * * ? *)'   # 07:00 KST = 22:00 UTC
+            Name: !Sub 'node-daily-briefing-${Stage}'
+            Description: Daily morning briefing generation
+
+  # ── Lambda: Notifications (SES email, EventBridge daily 09:00 KST) ──────
+  NotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'node-notification-${Stage}'
+      CodeUri: ./
+      Handler: handlers.notification_handler.handler
+      Timeout: 60
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt LambdaDLQ.Arn
+      Environment:
+        Variables:
+          SES_FROM_EMAIL: !Ref SesFromEmail
+          FRONTEND_URL: !Sub 'https://${CloudFrontDistribution.DomainName}'
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MainTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: '*'
+      Events:
+        DailyNotification:
+          Type: Schedule
+          Properties:
+            Schedule: 'cron(0 0 * * ? *)'   # 09:00 KST = 00:00 UTC
+            Name: !Sub 'node-daily-notification-${Stage}'
+            Description: Daily deadline and birthday notifications
+
+  # ── S3 (frontend hosting) ────────────────────────────────────────────────
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'node-frontend-${Stage}-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+
+  # ── CloudFront (PriceClass_100 = cheapest: US/EU/Asia) ──────────────────
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub 'node-oac-${Stage}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        PriceClass: PriceClass_100
+        HttpVersion: http2and3
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt CloudFrontOAC.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          # CachingOptimized managed policy
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          Compress: true
+        # SPA: return index.html for all 403/404s
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+
+  # ── CloudWatch Alarms ────────────────────────────────────────────────────
+  LambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'node-lambda-errors-${Stage}'
+      AlarmDescription: Triggers when any Lambda has 5+ errors in 5 minutes
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  DLQDepthAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'node-dlq-depth-${Stage}'
+      AlarmDescription: Messages in DLQ indicate Lambda failures
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt LambdaDLQ.QueueName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+# ── Outputs ──────────────────────────────────────────────────────────────────
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Stage}'
+    Export:
+      Name: !Sub 'node-ApiUrl-${Stage}'
+
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+    Export:
+      Name: !Sub 'node-UserPoolId-${Stage}'
+
+  UserPoolClientId:
+    Description: Cognito App Client ID
+    Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub 'node-UserPoolClientId-${Stage}'
+
+  CloudFrontUrl:
+    Description: CloudFront distribution URL
+    Value: !Sub 'https://${CloudFrontDistribution.DomainName}'
+    Export:
+      Name: !Sub 'node-CloudFrontUrl-${Stage}'
+
+  FrontendBucketName:
+    Description: S3 bucket for frontend assets
+    Value: !Ref FrontendBucket
+    Export:
+      Name: !Sub 'node-FrontendBucket-${Stage}'
+
+  DLQUrl:
+    Description: Dead letter queue URL for monitoring
+    Value: !Ref LambdaDLQ
