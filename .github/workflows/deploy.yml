@@ -78,7 +78,7 @@ jobs:
             --no-fail-on-empty-changeset \
             --parameter-overrides \
               Stage=dev \
-              SesFromEmail=${{ secrets.SES_FROM_EMAIL }}
+              "SesFromEmail=${{ secrets.SES_FROM_EMAIL }}"
 
   deploy-frontend:
     needs: [detect-changes, deploy-backend]
