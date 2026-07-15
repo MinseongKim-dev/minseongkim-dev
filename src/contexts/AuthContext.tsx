@@ -1,32 +1,37 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import type { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { getCurrentUser, signOut, type AuthUser } from 'aws-amplify/auth';
 import { AuthContext } from './_authContext';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = async () => {
-    const { data } = await supabase.auth.getUser();
-    setUser(data.user);
+    try {
+      const u = await getCurrentUser();
+      setUser(u);
+    } catch {
+      setUser(null);
+    }
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setIsLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
+    let active = true;
+    (async () => {
+      try {
+        const u = await getCurrentUser();
+        if (active) setUser(u);
+      } catch {
+        if (active) setUser(null);
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
+    return () => { active = false; };
   }, []);
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     setUser(null);
   };
 
@@ -36,3 +41,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
+
+
