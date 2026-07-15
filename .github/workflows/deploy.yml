@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      deploy_backend:
+        description: 'Force backend deploy'
+        type: boolean
+        default: true
+      deploy_frontend:
+        description: 'Force frontend deploy'
+        type: boolean
+        default: true
 
 env:
   AWS_REGION: ap-northeast-2
@@ -15,8 +25,8 @@ jobs:
     permissions:
       contents: read
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.result.outputs.backend }}
+      frontend: ${{ steps.result.outputs.frontend }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -36,6 +46,18 @@ jobs:
               - 'package-lock.json'
               - 'vite.config.ts'
               - 'tsconfig*.json'
+
+      - name: Resolve deploy targets
+        id: result
+        run: |
+          BACKEND="${{ steps.filter.outputs.backend }}"
+          FRONTEND="${{ steps.filter.outputs.frontend }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BACKEND="${{ github.event.inputs.deploy_backend }}"
+            FRONTEND="${{ github.event.inputs.deploy_frontend }}"
+          fi
+          echo "backend=$BACKEND" >> $GITHUB_OUTPUT
+          echo "frontend=$FRONTEND" >> $GITHUB_OUTPUT
 
   deploy-backend:
     needs: detect-changes
