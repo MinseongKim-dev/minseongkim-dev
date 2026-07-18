@@ -3,6 +3,7 @@ import { X, Send } from 'lucide-react';
 import { useAppStore, type ViewId } from '../stores/app.store';
 import { useToastStore } from '../stores/toast.store';
 import { api } from '../api/client';
+import { SPECIALISTS } from '../specialists';
 
 // Inject typing-dot animation once
 if (typeof document !== 'undefined' && !document.getElementById('node-chat-anim')) {
@@ -44,7 +45,6 @@ const VIEW_TO_DOMAIN: Record<ViewId, string> = {
 };
 
 const INIT_MSG: Msg = { role: 'ai', text: '안녕하세요! 오늘 일정과 할 일을 확인하고, 궁금한 것을 물어보세요.' };
-const QUICK = ['오늘 요약', '일정 잡아줘', '운동 추천', '커리어 체크', '지출 분석'];
 
 function renderText(text: string) {
   return text.split('\n').map((line, i, arr) => (
@@ -53,7 +53,8 @@ function renderText(text: string) {
 }
 
 export function ChatPanel() {
-  const { setChatOpen, view } = useAppStore();
+  const { setChatOpen, view, pendingMessage, clearPendingMessage } = useAppStore();
+  const specialist = SPECIALISTS[view];
   const [msgs, setMsgs] = useState<Msg[]>([INIT_MSG]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -62,6 +63,13 @@ export function ChatPanel() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [msgs, loading]);
+
+  useEffect(() => {
+    if (pendingMessage) {
+      clearPendingMessage();
+      void send(pendingMessage);
+    }
+  }, [pendingMessage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = async (text?: string) => {
     const msg = (text ?? input).trim();
@@ -101,23 +109,27 @@ export function ChatPanel() {
     }}>
       {/* Header */}
       <div style={{
-        padding: '16px', borderBottom: `1px solid ${C.b0}`,
+        padding: '14px 16px', borderBottom: `1px solid ${C.b0}`,
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
         <div style={{
-          width: 28, height: 28, borderRadius: '50%',
-          background: `linear-gradient(135deg,${C.blue},${C.violet})`,
+          width: 28, height: 28, borderRadius: 8,
+          background: `${specialist.color}25`,
+          border: `1px solid ${specialist.color}40`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 12, fontWeight: 700, color: '#fff',
-        }}>N</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ color: C.t0, fontSize: 13.5, fontWeight: 600 }}>Node AI</div>
+          fontSize: 10, fontWeight: 700, color: specialist.color,
+          flexShrink: 0,
+        }}>AI</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: C.t0, fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {specialist.name}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
-            <div style={{ width: 5, height: 5, borderRadius: '50%', background: C.teal, boxShadow: `0 0 5px ${C.teal}` }} />
-            <span style={{ color: C.teal, fontSize: 10 }}>온라인</span>
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: specialist.color, boxShadow: `0 0 5px ${specialist.color}` }} />
+            <span style={{ color: specialist.color, fontSize: 10 }}>{specialist.role}</span>
           </div>
         </div>
-        <button onClick={() => setChatOpen(false)} style={{ color: C.t1, cursor: 'pointer', display: 'flex' }}>
+        <button onClick={() => setChatOpen(false)} style={{ color: C.t1, cursor: 'pointer', display: 'flex', flexShrink: 0 }}>
           <X size={14} />
         </button>
       </div>
@@ -193,10 +205,11 @@ export function ChatPanel() {
 
       {/* Quick actions */}
       <div style={{ padding: '8px 12px', borderTop: `1px solid ${C.b0}`, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {QUICK.map((q) => (
+        {specialist.quickActions.slice(0, 4).map((q) => (
           <button key={q} onClick={() => void send(q)} style={{
-            background: C.bg3, border: `1px solid ${C.b1}`, borderRadius: 20,
-            padding: '4px 10px', color: C.t1, fontSize: 11, cursor: 'pointer', fontFamily: font,
+            background: `${specialist.color}10`, border: `1px solid ${specialist.color}28`,
+            borderRadius: 20, padding: '4px 10px', color: specialist.color,
+            fontSize: 11, cursor: 'pointer', fontFamily: font,
           }}>
             {q}
           </button>
