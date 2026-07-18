@@ -7,6 +7,7 @@ import { ChatPanel } from './shared/ui/ChatPanel';
 import { ToastContainer } from './shared/ui/ToastContainer';
 import { QuickCapture } from './shared/components/QuickCapture';
 import { WeeklyReview } from './shared/components/WeeklyReview';
+import { SpecialistBanner } from './shared/components/SpecialistBanner';
 import { useAppStore } from './shared/stores/app.store';
 import { useWindowSize } from './shared/hooks/useWindowSize';
 
@@ -38,13 +39,13 @@ function NodeApp() {
           <div style={{ padding: isMobile ? '12px 14px' : '16px 20px', paddingBottom: isMobile ? 72 : undefined }}>
           <Suspense fallback={null}>
             {view === 'dashboard' && <DashboardView />}
-            {view === 'schedule'  && <ScheduleView />}
-            {view === 'tasks'     && <TasksView />}
-            {view === 'finance'   && <FinanceView />}
-            {view === 'health'    && <HealthView />}
-            {view === 'learning'  && <LearningView />}
-            {view === 'career'    && <CareerView />}
-            {view === 'relations' && <RelationshipsView />}
+            {view === 'schedule'  && <><SpecialistBanner view="schedule" /><ScheduleView /></>}
+            {view === 'tasks'     && <><SpecialistBanner view="tasks" /><TasksView /></>}
+            {view === 'finance'   && <><SpecialistBanner view="finance" /><FinanceView /></>}
+            {view === 'health'    && <><SpecialistBanner view="health" /><HealthView /></>}
+            {view === 'learning'  && <><SpecialistBanner view="learning" /><LearningView /></>}
+            {view === 'career'    && <><SpecialistBanner view="career" /><CareerView /></>}
+            {view === 'relations' && <><SpecialistBanner view="relations" /><RelationshipsView /></>}
           </Suspense>
           </div>
         </div>

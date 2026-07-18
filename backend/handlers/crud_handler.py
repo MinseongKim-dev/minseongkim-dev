@@ -15,9 +15,14 @@ DOMAIN_MAP: dict[str, str] = {
     "workouts": "WORKOUT",
     "sleep": "SLEEP",
     "health": "HEALTH",
+    "weight": "WEIGHT",
+    "water": "WATER",
+    "steps": "STEPS",
+    "mood": "MOOD",
     "learning": "LGOAL",
     "study": "STUDY",
     "books": "BOOK",
+    "flashcards": "FLASH",
     "contacts": "CONTACT",
     "meetings": "MEETING",
     "career-goals": "CGOAL",
@@ -29,8 +34,11 @@ DOMAIN_MAP: dict[str, str] = {
     "salary": "SALARY",
     "work-logs": "WLOG",
     "career-targets": "TARGET",
+    "targets": "TARGET",
     "career-paths": "CPATH",
+    "cpaths": "CPATH",
     "coaching": "COACH",
+    "coachlogs": "CLOG",
 }
 
 
