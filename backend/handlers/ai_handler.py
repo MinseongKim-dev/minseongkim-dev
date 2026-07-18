@@ -7,7 +7,8 @@ from datetime import date, datetime
 
 import boto3
 
-from prompts.system import SYSTEM_PROMPT
+from prompts.specialists import get_specialist_prompt
+from prompts.system import BASE_SYSTEM_PROMPT, build_system_prompt
 from repositories import get_repository
 from utils.cost_guard import BedrockCostGuard
 from utils.response import error, ok
@@ -43,8 +44,12 @@ def handler(event, context):
     ctx = _build_context(user_id)
     messages = _format_messages(history, user_input, ctx)
 
+    domain_hint = body.get("domain")
+    specialist_prompt = get_specialist_prompt(domain_hint) if domain_hint else None
+    system_prompt = build_system_prompt(specialist_prompt)
+
     try:
-        raw, usage = _call_bedrock(messages)
+        raw, usage = _call_bedrock(messages, system_prompt)
     except Exception as exc:
         return error(f"AI service error: {exc}", 502)
 
@@ -99,7 +104,7 @@ def _format_messages(history: list, user_input: str, ctx: dict) -> list:
     return messages
 
 
-def _call_bedrock(messages: list) -> tuple[str, dict]:
+def _call_bedrock(messages: list, system_prompt: str | None = None) -> tuple[str, dict]:
     response = _bedrock.invoke_model(
         modelId=_MODEL_ID,
         contentType="application/json",
@@ -107,7 +112,7 @@ def _call_bedrock(messages: list) -> tuple[str, dict]:
         body=json.dumps({
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": 4096,
-            "system": SYSTEM_PROMPT,
+            "system": system_prompt or BASE_SYSTEM_PROMPT,
             "messages": messages,
         }),
     )
@@ -131,13 +136,17 @@ def _parse_response(raw: str) -> dict:
 def _execute_actions(user_id: str, actions: list[dict]) -> None:
     domain_map = {
         "events": "EVENT", "tasks": "TASK", "projects": "PROJECT",
-        "transactions": "TXN", "budgets": "BUDGET", "workouts": "WORKOUT",
-        "sleep": "SLEEP", "health": "HEALTH", "learning": "LGOAL",
-        "study": "STUDY", "books": "BOOK", "contacts": "CONTACT",
-        "meetings": "MEETING", "career-goals": "CGOAL", "skills": "SKILL",
-        "achievements": "ACHIEVE", "job-apps": "JOBAPP",
-        "journals": "JOURNAL", "certs": "CERT", "salary": "SALARY",
-        "work-logs": "WLOG",
+        "transactions": "TXN", "budgets": "BUDGET", "savings-goals": "SAVING",
+        "workouts": "WORKOUT", "sleep": "SLEEP", "health": "HEALTH",
+        "weight": "WEIGHT", "water": "WATER", "steps": "STEPS", "mood": "MOOD",
+        "learning": "LGOAL", "study": "STUDY", "books": "BOOK", "flashcards": "FLASH",
+        "contacts": "CONTACT", "meetings": "MEETING",
+        "career-goals": "CGOAL", "skills": "SKILL", "achievements": "ACHIEVE",
+        "job-apps": "JOBAPP", "journals": "JOURNAL", "certs": "CERT",
+        "salary": "SALARY", "work-logs": "WLOG",
+        "career-targets": "TARGET", "targets": "TARGET",
+        "career-paths": "CPATH", "cpaths": "CPATH",
+        "coaching": "COACH", "coachlogs": "CLOG",
     }
     for action in actions:
         if action.get("type") != "db_operation":
