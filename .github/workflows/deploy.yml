@@ -106,7 +106,7 @@ jobs:
     needs: [detect-changes, deploy-backend]
     if: |
       always() &&
-      needs.detect-changes.outputs.frontend == 'true' &&
+      (needs.detect-changes.outputs.frontend == 'true' || needs.deploy-backend.result == 'success') &&
       (needs.deploy-backend.result == 'success' || needs.deploy-backend.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
