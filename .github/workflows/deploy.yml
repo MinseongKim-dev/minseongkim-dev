@@ -91,6 +91,10 @@ jobs:
       - name: SAM deploy
         working-directory: backend
         run: |
+          PARAM_OVERRIDES="Stage=dev"
+          if [ -n "${{ secrets.SES_FROM_EMAIL }}" ]; then
+            PARAM_OVERRIDES="$PARAM_OVERRIDES SesFromEmail=${{ secrets.SES_FROM_EMAIL }}"
+          fi
           sam deploy \
             --stack-name ${{ env.STACK_NAME }} \
             --s3-bucket ${{ secrets.SAM_ARTIFACTS_BUCKET }} \
@@ -98,9 +102,7 @@ jobs:
             --region ${{ env.AWS_REGION }} \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --parameter-overrides \
-              Stage=dev \
-              "SesFromEmail=${{ secrets.SES_FROM_EMAIL }}"
+            --parameter-overrides $PARAM_OVERRIDES
 
   deploy-frontend:
     needs: [detect-changes, deploy-backend]
