@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Send } from 'lucide-react';
-import { useAppStore } from '../stores/app.store';
+import { useAppStore, type ViewId } from '../stores/app.store';
 import { useToastStore } from '../stores/toast.store';
 import { api } from '../api/client';
 
@@ -32,6 +32,17 @@ interface Msg {
   followUp?: string;
 }
 
+const VIEW_TO_DOMAIN: Record<ViewId, string> = {
+  dashboard: 'cross',
+  schedule: 'schedule',
+  tasks: 'tasks',
+  finance: 'finance',
+  health: 'health',
+  learning: 'learning',
+  career: 'career',
+  relations: 'relationships',
+};
+
 const INIT_MSG: Msg = { role: 'ai', text: '안녕하세요! 오늘 일정과 할 일을 확인하고, 궁금한 것을 물어보세요.' };
 const QUICK = ['오늘 요약', '일정 잡아줘', '운동 추천', '커리어 체크', '지출 분석'];
 
@@ -42,7 +53,7 @@ function renderText(text: string) {
 }
 
 export function ChatPanel() {
-  const { setChatOpen } = useAppStore();
+  const { setChatOpen, view } = useAppStore();
   const [msgs, setMsgs] = useState<Msg[]>([INIT_MSG]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -70,7 +81,8 @@ export function ChatPanel() {
           content: m.text,
         }));
 
-      const res = await api.post<AiResponse>('/ai/chat', { message: msg, history });
+      const domain = VIEW_TO_DOMAIN[view];
+      const res = await api.post<AiResponse>('/ai/chat', { message: msg, history, domain });
       setMsgs((m) => [...m, { role: 'ai', text: res.message, followUp: res.followUp }]);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : '오류가 발생했습니다';
