@@ -6,6 +6,7 @@ export interface Contact {
   id: string;
   name: string;
   relationship: string;
+  tier?: 1 | 2 | 3 | 4;
   lastContact?: string;
   notes?: string;
   phone?: string;

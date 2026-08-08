@@ -87,6 +87,108 @@ function StatCard({
   );
 }
 
+function computeRecoveryScore(
+  workouts: { date: string; duration: number }[],
+  sleepLogs: { date: string; duration: number }[],
+  today: string,
+): { score: number; band: 'HIGH' | 'MEDIUM' | 'LOW'; sleepDebtHours: number } {
+  const todayDt = new Date(today);
+
+  // Sleep score 0-50: avg sleep vs 480 min target over last 7 days
+  const last7Sleep = sleepLogs.filter((l) => {
+    const diff = Math.floor((todayDt.getTime() - new Date(l.date).getTime()) / 86400000);
+    return diff >= 0 && diff < 7;
+  });
+  const avgSleepMins = last7Sleep.length > 0
+    ? last7Sleep.reduce((s, l) => s + l.duration, 0) / last7Sleep.length
+    : 240;
+  const sleepScore = Math.min(50, Math.round((avgSleepMins / 480) * 50));
+
+  // Weekly sleep debt (in hours)
+  const totalActualMins = last7Sleep.reduce((s, l) => s + l.duration, 0);
+  const sleepDebtHours = Math.max(0, +(((480 * 7) - totalActualMins) / 60).toFixed(1));
+
+  // Workout recovery score 0-50: inverse of recent training load
+  let fatigue = 0;
+  workouts.forEach((w) => {
+    const daysAgo = Math.floor((todayDt.getTime() - new Date(w.date).getTime()) / 86400000);
+    if (daysAgo >= 0 && daysAgo <= 3) {
+      const intensity = 2; // default medium since we don't store intensity on workout log here
+      fatigue += intensity * Math.max(0, 4 - daysAgo);
+    }
+  });
+  const workoutScore = Math.max(0, Math.min(50, 50 - Math.round(fatigue * 1.5)));
+
+  const score = sleepScore + workoutScore;
+  const band = score >= 80 ? 'HIGH' : score >= 50 ? 'MEDIUM' : 'LOW';
+  return { score, band, sleepDebtHours };
+}
+
+const RECOVERY_BAND_COLOR = { HIGH: '#00CCA0', MEDIUM: '#EFA020', LOW: '#F05472' } as const;
+const RECOVERY_BAND_LABEL = { HIGH: '회복 우수', MEDIUM: '회복 중간', LOW: '회복 필요' } as const;
+
+function RecoveryGauge({ score, band, sleepDebtHours }: { score: number; band: 'HIGH' | 'MEDIUM' | 'LOW'; sleepDebtHours: number }) {
+  const color = RECOVERY_BAND_COLOR[band];
+  const circumference = 2 * Math.PI * 36;
+  const offset = circumference * (1 - score / 100);
+
+  return (
+    <div style={{
+      background: C.bg2, border: `1px solid ${color}30`,
+      borderLeft: `3px solid ${color}`,
+      borderRadius: 12, padding: '16px 18px', marginBottom: 20,
+      display: 'flex', alignItems: 'center', gap: 20,
+    }}>
+      {/* Arc gauge */}
+      <div style={{ flexShrink: 0, position: 'relative', width: 84, height: 84 }}>
+        <svg width={84} height={84} style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={42} cy={42} r={36} fill="none" stroke={C.b1} strokeWidth={7} />
+          <circle
+            cx={42} cy={42} r={36} fill="none"
+            stroke={color} strokeWidth={7}
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+          />
+        </svg>
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ color, fontSize: 20, fontWeight: 700, fontFamily: mono, lineHeight: 1 }}>{score}</span>
+          <span style={{ color: C.t1, fontSize: 9, marginTop: 2 }}>/ 100</span>
+        </div>
+      </div>
+
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+          <span style={{
+            color, fontSize: 11, fontWeight: 700,
+            background: `${color}18`, borderRadius: 6, padding: '2px 8px',
+          }}>{RECOVERY_BAND_LABEL[band]}</span>
+          <span style={{ color: C.t1, fontSize: 11 }}>회복도</span>
+        </div>
+        {sleepDebtHours > 0 && (
+          <p style={{ color: C.t1, fontSize: 12, lineHeight: 1.5 }}>
+            주간 수면 부채 <span style={{ color: sleepDebtHours >= 10 ? C.rose : C.amber, fontWeight: 600 }}>{sleepDebtHours}h</span>
+            {sleepDebtHours >= 10 ? ' — 만성 수면 부족' : sleepDebtHours >= 5 ? ' — 오늘 일찍 취침 권장' : ''}
+          </p>
+        )}
+        {band === 'LOW' && (
+          <p style={{ color: C.rose, fontSize: 11.5, marginTop: 4 }}>고강도 운동을 피하고 충분히 쉬세요.</p>
+        )}
+        {band === 'MEDIUM' && (
+          <p style={{ color: C.amber, fontSize: 11.5, marginTop: 4 }}>가벼운 운동과 스트레칭이 적합합니다.</p>
+        )}
+        {band === 'HIGH' && (
+          <p style={{ color: C.teal, fontSize: 11.5, marginTop: 4 }}>몸 상태가 좋습니다. 훈련 강도를 높여도 좋아요.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DashboardTab() {
   const { items, sleepLogs } = useHealthStore();
   const today = new Date().toISOString().split('T')[0];
@@ -132,8 +234,12 @@ function DashboardTab() {
 
   const todaySleep = sleepLogs.find((l) => l.date === today);
 
+  const recovery = computeRecoveryScore(items, sleepLogs, today);
+
   return (
     <>
+      <RecoveryGauge score={recovery.score} band={recovery.band} sleepDebtHours={recovery.sleepDebtHours} />
+
       {daysSinceWorkout !== null && daysSinceWorkout >= 3 && (
         <div style={{ background: `${C.amber}10`, border: `1px solid ${C.amber}40`, borderLeft: `3px solid ${C.amber}`, borderRadius: 10, padding: '10px 14px', marginBottom: 18, fontSize: 12.5, color: C.t0 }}>
           마지막 운동으로부터 <strong style={{ color: C.amber }}>{daysSinceWorkout}일</strong> 지났습니다.
