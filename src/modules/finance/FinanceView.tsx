@@ -373,17 +373,37 @@ export function FinanceView() {
               {EXPENSE_CATEGORIES.map((cat) => {
                 const budget = budgets.find((b) => b.category === cat);
                 const spent = expenseByCategory[cat] ?? 0;
-                const pct = budget ? Math.min(100, (spent / budget.amount) * 100) : 0;
-                const over = budget && spent > budget.amount;
+                const rawPct = budget ? (spent / budget.amount) * 100 : 0;
+                const pct = Math.min(100, rawPct);
                 if (!budget && spent === 0) return null;
+
+                // 4-stage burn rate
+                const stage = rawPct >= 100 ? 4 : rawPct >= 90 ? 3 : rawPct >= 70 ? 2 : rawPct >= 50 ? 1 : 0;
+                const stageColor = stage >= 4 ? C.rose : stage === 3 ? '#F07020' : stage === 2 ? C.amber : C.teal;
+                const stageLabel = stage >= 4 ? '초과' : stage === 3 ? '위험' : stage === 2 ? '경고' : stage === 1 ? '주의' : null;
+
                 return (
-                  <div key={cat} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: '14px 16px' }}>
+                  <div key={cat} style={{
+                    background: C.bg2,
+                    border: `1px solid ${stage >= 3 ? stageColor + '40' : C.b1}`,
+                    borderLeft: stage >= 2 ? `3px solid ${stageColor}` : `1px solid ${C.b1}`,
+                    borderRadius: 10, padding: '14px 16px',
+                  }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                      <Target size={13} color={over ? C.rose : C.amber} />
+                      <Target size={13} color={stageColor} />
                       <span style={{ color: C.t0, fontSize: 13.5, fontWeight: 500, flex: 1 }}>{cat}</span>
+                      {stageLabel && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 700,
+                          color: stageColor, background: `${stageColor}18`,
+                          borderRadius: 5, padding: '2px 7px',
+                        }}>
+                          {stageLabel}
+                        </span>
+                      )}
                       <span style={{ color: C.t1, fontSize: 12, fontFamily: mono }}>
                         {fmt(spent)}
-                        {budget && <span style={{ color: over ? C.rose : C.t1 }}> / {fmt(budget.amount)}</span>}
+                        {budget && <span style={{ color: stage >= 3 ? stageColor : C.t1 }}> / {fmt(budget.amount)}</span>}
                       </span>
                       {budget && (
                         <button onClick={() => removeBudget(budget.id)} style={{ color: C.t2, cursor: 'pointer', display: 'flex' }}>
@@ -392,11 +412,22 @@ export function FinanceView() {
                       )}
                     </div>
                     {budget && (
-                      <div style={{ height: 4, background: C.bg3, borderRadius: 2 }}>
-                        <div style={{ height: '100%', width: `${pct}%`, background: over ? C.rose : pct > 80 ? C.amber : C.teal, borderRadius: 2, transition: 'width 0.3s' }} />
-                      </div>
+                      <>
+                        <div style={{ height: 5, background: C.bg3, borderRadius: 3 }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: stageColor, borderRadius: 3, transition: 'width 0.3s' }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                          <span style={{ fontSize: 9.5, color: C.t2 }}>
+                            {stage === 0 ? '50% 미만' : `Stage ${stage}`}
+                          </span>
+                          <span style={{ fontSize: 9.5, fontFamily: mono, color: stage >= 2 ? stageColor : C.t2 }}>
+                            {Math.round(rawPct)}%
+                          </span>
+                        </div>
+                        {stage >= 4 && <p style={{ color: C.rose, fontSize: 11, marginTop: 4 }}>예산 {fmt(spent - budget.amount)} 초과 — 즉시 지출 중단 필요</p>}
+                        {stage === 3 && <p style={{ color: '#F07020', fontSize: 11, marginTop: 4 }}>잔여 예산 {fmt(budget.amount - spent)} — 나머지 지출 최소화하세요.</p>}
+                      </>
                     )}
-                    {over && <p style={{ color: C.rose, fontSize: 11, marginTop: 6 }}>예산 {fmt(spent - budget!.amount)} 초과</p>}
                   </div>
                 );
               })}

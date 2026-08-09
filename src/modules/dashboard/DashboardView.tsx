@@ -11,7 +11,7 @@ import { useFinanceStore } from '../../shared/stores/finance.store';
 import { useHealthStore } from '../../shared/stores/health.store';
 import { useLearningStore } from '../../shared/stores/learning.store';
 import { useRelationshipsStore } from '../../shared/stores/relationships.store';
-import { useBriefingStore } from '../../shared/stores/briefing.store';
+import { useBriefingStore, type SpecialistBriefMeta } from '../../shared/stores/briefing.store';
 
 const C = {
   bg2: '#0D1228', bg3: '#131B32',
@@ -24,6 +24,25 @@ const font = '"Space Grotesk", system-ui, sans-serif';
 const mono = '"JetBrains Mono", "Fira Code", monospace';
 
 type DotStatus = 'ok' | 'warn' | 'alert';
+
+const SPECIALIST_CFG: Partial<Record<string, { label: string; Icon: React.ComponentType<{ size?: number; color?: string }>; color: string }>> = {
+  schedule: { label: '시간 설계사', Icon: Calendar, color: C.blue },
+  tasks: { label: '실행 코치', Icon: CheckSquare, color: C.violet },
+  finance: { label: '재무 어드바이저', Icon: DollarSign, color: C.amber },
+  health: { label: '회복 코치', Icon: Activity, color: C.teal },
+  learning: { label: '학습 코치', Icon: BookOpen, color: C.sky },
+  career: { label: '커리어 전략가', Icon: Briefcase, color: '#9B7CF5' },
+  relations: { label: '관계 매니저', Icon: Users, color: C.rose },
+};
+
+const ALERT_LEVEL_CFG: Record<string, { color: string; label: string }> = {
+  none:   { color: 'transparent', label: '' },
+  low:    { color: '#EFA020', label: 'Level 1' },
+  medium: { color: '#F07020', label: 'Level 2' },
+  high:   { color: '#F05050', label: 'Level 3' },
+};
+
+const LEVEL_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2, none: 3 };
 
 interface CardConfig {
   id: ViewId;
@@ -96,7 +115,7 @@ export function DashboardView() {
   const { items: workouts, fetch: fetchWorkouts } = useHealthStore();
   const { goals, books, fetch: fetchLearning } = useLearningStore();
   const { items: contacts, fetch: fetchContacts } = useRelationshipsStore();
-  const { item: briefing, fetch: fetchBriefing } = useBriefingStore();
+  const { item: briefing, specialistMeta, fetch: fetchBriefing } = useBriefingStore();
 
   useEffect(() => {
     fetchTasks();
@@ -259,6 +278,64 @@ export function DashboardView() {
         }
       : null;
 
+  // Cross-specialist signals from AI
+  const activeAlerts = (Object.entries(specialistMeta) as [string, SpecialistBriefMeta][])
+    .filter(([, meta]) => meta.alertLevel !== 'none')
+    .sort(([, a], [, b]) => (LEVEL_ORDER[a.alertLevel] ?? 3) - (LEVEL_ORDER[b.alertLevel] ?? 3));
+
+  const specialistAlertsPanel = activeAlerts.length > 0 ? (
+    <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+        <AlertTriangle size={12} color="#F05050" />
+        <span style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+          전문가 신호
+        </span>
+        <span style={{ marginLeft: 'auto', fontFamily: mono, fontSize: 10, color: C.t2 }}>
+          {activeAlerts.length}개 활성
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        {activeAlerts.map(([viewId, meta]) => {
+          const cfg = SPECIALIST_CFG[viewId];
+          const alrt = ALERT_LEVEL_CFG[meta.alertLevel] ?? ALERT_LEVEL_CFG.none;
+          if (!cfg) return null;
+          return (
+            <div
+              key={viewId}
+              onClick={() => setView(viewId as Parameters<typeof setView>[0])}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && setView(viewId as Parameters<typeof setView>[0])}
+              style={{
+                cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4,
+                background: `${alrt.color}0A`, border: `1px solid ${alrt.color}30`,
+                borderRadius: 8, padding: '9px 12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <cfg.Icon size={11} color={cfg.color} />
+                  <span style={{ color: cfg.color, fontSize: 11, fontWeight: 600 }}>{cfg.label}</span>
+                </div>
+                <span style={{
+                  fontSize: 9.5, fontWeight: 700, color: alrt.color,
+                  background: `${alrt.color}20`, borderRadius: 4, padding: '1px 5px',
+                }}>
+                  {alrt.label}
+                </span>
+              </div>
+              {meta.primaryAlert && (
+                <p style={{ color: C.t0, fontSize: 11.5, lineHeight: 1.4, margin: 0 }}>
+                  {meta.primaryAlert}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
+
   // Fallback local briefing text (when no AI briefing exists)
   const briefingParts: string[] = [];
   if (todayEvents.length > 0) briefingParts.push(`오늘 일정 ${todayEvents.length}개`);
@@ -403,6 +480,11 @@ export function DashboardView() {
         </div>
       )}
 
+      {/* Specialist signals — mobile only (desktop shows in sidebar) */}
+      {isMobile && specialistAlertsPanel && (
+        <div style={{ marginBottom: 12 }}>{specialistAlertsPanel}</div>
+      )}
+
       {/* Domain grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
         {DOMAIN_CARDS.map((card) => (
@@ -414,6 +496,9 @@ export function DashboardView() {
       {/* RIGHT panel (desktop only) */}
       {!isMobile && (
         <div style={{ width: 272, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+          {/* Specialist signals */}
+          {specialistAlertsPanel}
 
           {/* 오늘 할 일 */}
           <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>

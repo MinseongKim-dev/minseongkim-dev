@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAppStore, type ViewId } from '../stores/app.store';
-import { useBriefingStore } from '../stores/briefing.store';
+import { useBriefingStore, type AlertLevel } from '../stores/briefing.store';
 import { SPECIALISTS } from '../specialists';
 
 const C = {
@@ -10,15 +10,33 @@ const C = {
 };
 const font = '"Space Grotesk", system-ui, sans-serif';
 
+const ALERT_COLORS: Record<AlertLevel, string> = {
+  none: 'transparent',
+  low: '#EFA020',
+  medium: '#F07020',
+  high: '#F05050',
+};
+
+const ALERT_LABELS: Record<AlertLevel, string | null> = {
+  none: null,
+  low: 'Level 1',
+  medium: 'Level 2',
+  high: 'Level 3',
+};
+
 interface Props {
   view: ViewId;
 }
 
 export function SpecialistBanner({ view }: Props) {
   const { sendToChatOpen } = useAppStore();
-  const { specialistInsights, fetch, item } = useBriefingStore();
+  const { specialistInsights, specialistMeta, fetch, item } = useBriefingStore();
   const spec = SPECIALISTS[view];
   const insight = specialistInsights[view] ?? null;
+  const meta = specialistMeta[view] ?? null;
+  const alertLevel: AlertLevel = meta?.alertLevel ?? 'none';
+  const alertColor = ALERT_COLORS[alertLevel];
+  const alertLabel = ALERT_LABELS[alertLevel];
 
   useEffect(() => {
     if (!item && !insight) fetch();
@@ -29,8 +47,8 @@ export function SpecialistBanner({ view }: Props) {
   return (
     <div style={{
       background: C.bg2,
-      border: `1px solid ${spec.color}22`,
-      borderLeft: `3px solid ${spec.color}`,
+      border: `1px solid ${alertLevel !== 'none' ? alertColor + '40' : spec.color + '22'}`,
+      borderLeft: `3px solid ${alertLevel !== 'none' ? alertColor : spec.color}`,
       borderRadius: 12,
       padding: '12px 16px',
       marginBottom: 14,
@@ -51,13 +69,46 @@ export function SpecialistBanner({ view }: Props) {
           <span style={{ color: C.t0, fontSize: 12.5, fontWeight: 600 }}>{spec.name}</span>
           <span style={{ color: C.t1, fontSize: 11, marginLeft: 7 }}>{spec.role}</span>
         </div>
-        <div style={{
-          marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
-        }}>
-          <div style={{ width: 5, height: 5, borderRadius: '50%', background: spec.color, boxShadow: `0 0 5px ${spec.color}` }} />
-          <span style={{ color: spec.color, fontSize: 10 }}>활성</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {alertLabel && (
+            <span style={{
+              background: alertColor + '20',
+              border: `1px solid ${alertColor}50`,
+              borderRadius: 10,
+              padding: '2px 7px',
+              color: alertColor,
+              fontSize: 10,
+              fontWeight: 600,
+            }}>
+              {alertLabel}
+            </span>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{
+              width: 5, height: 5, borderRadius: '50%',
+              background: alertLevel !== 'none' ? alertColor : spec.color,
+              boxShadow: `0 0 5px ${alertLevel !== 'none' ? alertColor : spec.color}`,
+            }} />
+            <span style={{ color: alertLevel !== 'none' ? alertColor : spec.color, fontSize: 10 }}>활성</span>
+          </div>
         </div>
       </div>
+
+      {/* Primary alert callout */}
+      {meta?.primaryAlert && alertLevel !== 'none' && (
+        <div style={{
+          background: alertColor + '12',
+          border: `1px solid ${alertColor}30`,
+          borderRadius: 7,
+          padding: '6px 10px',
+          marginBottom: 8,
+          color: alertColor,
+          fontSize: 11.5,
+          lineHeight: 1.5,
+        }}>
+          ⚠ {meta.primaryAlert}
+        </div>
+      )}
 
       {/* AI insight */}
       {insight && (

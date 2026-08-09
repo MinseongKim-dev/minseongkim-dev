@@ -23,16 +23,27 @@ export interface BriefingRecord {
   briefing: DailyBriefing;
 }
 
+export type AlertLevel = 'none' | 'low' | 'medium' | 'high';
+
+export interface SpecialistBriefMeta {
+  insight: string;
+  alertLevel: AlertLevel;
+  primaryAlert: string | null;
+}
+
 interface SpecialistBriefRecord {
   id: string;
   date: string;
   domain: string;
   insight: string;
+  alertLevel?: AlertLevel;
+  primaryAlert?: string | null;
 }
 
 interface BriefingStore {
   item: BriefingRecord | null;
   specialistInsights: Partial<Record<ViewId, string>>;
+  specialistMeta: Partial<Record<ViewId, SpecialistBriefMeta>>;
   loading: boolean;
   fetch: () => Promise<void>;
 }
@@ -45,6 +56,7 @@ const VIEW_TO_DOMAIN: Partial<Record<ViewId, string>> = {
 export const useBriefingStore = create<BriefingStore>((set) => ({
   item: null,
   specialistInsights: {},
+  specialistMeta: {},
   loading: false,
 
   fetch: async () => {
@@ -59,15 +71,23 @@ export const useBriefingStore = create<BriefingStore>((set) => ({
 
       const today = new Date().toISOString().split('T')[0];
       const specialistInsights: Partial<Record<ViewId, string>> = {};
+      const specialistMeta: Partial<Record<ViewId, SpecialistBriefMeta>> = {};
 
       for (const [view, domain] of Object.entries(VIEW_TO_DOMAIN) as [ViewId, string][]) {
         const match = all
           .filter((i) => i.type === 'specialist_brief' && (i as unknown as SpecialistBriefRecord).domain === domain && i.date === today)
           .sort((a, b) => b.date.localeCompare(a.date))[0] as unknown as SpecialistBriefRecord | undefined;
-        if (match?.insight) specialistInsights[view] = match.insight;
+        if (match?.insight) {
+          specialistInsights[view] = match.insight;
+          specialistMeta[view] = {
+            insight: match.insight,
+            alertLevel: match.alertLevel ?? 'none',
+            primaryAlert: match.primaryAlert ?? null,
+          };
+        }
       }
 
-      set({ item: briefings[0] ?? null, specialistInsights });
+      set({ item: briefings[0] ?? null, specialistInsights, specialistMeta });
     } catch {
       // silently fail
     } finally {

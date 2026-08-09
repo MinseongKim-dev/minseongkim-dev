@@ -306,6 +306,67 @@ function AddTaskForm({ projects, goals, parentLabel, onSubmit, onCancel }: AddTa
   );
 }
 
+function MITSection({ tasks, toggle }: { tasks: Task[]; toggle: (id: string, done: boolean) => void }) {
+  const active = tasks.filter((t) => !t.done);
+  const mit = [...active]
+    .sort((a, b) => {
+      const priorityOrder: Record<Priority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+      const pa = priorityOrder[a.priority] ?? 3;
+      const pb = priorityOrder[b.priority] ?? 3;
+      if (pa !== pb) return pa - pb;
+      if (a.due && b.due) return a.due.localeCompare(b.due);
+      if (a.due) return -1;
+      if (b.due) return 1;
+      return 0;
+    })
+    .slice(0, 3);
+
+  if (mit.length === 0) return null;
+
+  return (
+    <div style={{
+      background: '#0D1228',
+      border: `1px solid ${C.violet}30`,
+      borderLeft: `3px solid ${C.violet}`,
+      borderRadius: 12,
+      padding: '12px 16px',
+      marginBottom: 14,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: C.violet, letterSpacing: '0.5px', textTransform: 'uppercase' }}>MIT</span>
+        <span style={{ color: C.t1, fontSize: 11 }}>오늘 반드시 완료할 3가지</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        {mit.map((task, idx) => {
+          return (
+            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{
+                width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                background: `${C.violet}20`, border: `1px solid ${C.violet}40`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 700, color: C.violet,
+              }}>{idx + 1}</span>
+              <button onClick={() => toggle(task.id, true)} style={{ display: 'flex', flexShrink: 0, cursor: 'pointer' }}>
+                <Circle size={14} color={C.t2} />
+              </button>
+              <span style={{ flex: 1, color: C.t0, fontSize: 13, lineHeight: 1.3 }}>{task.title}</span>
+              <span style={{
+                fontSize: 10, fontWeight: 600,
+                color: PRIORITY_COLOR[task.priority],
+                background: `${PRIORITY_COLOR[task.priority]}18`,
+                borderRadius: 5, padding: '2px 7px', flexShrink: 0,
+              }}>{PRIORITY_LABEL[task.priority]}</span>
+              {task.due && (
+                <span style={{ fontSize: 10, fontFamily: mono, color: C.t2, flexShrink: 0 }}>{task.due}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function TasksView() {
   const { items, projects, loading, fetch, add, toggle, setStatus, remove, addProject, removeProject } = useTasksStore();
   const { goals: learningGoals } = useLearningStore();
@@ -419,6 +480,8 @@ export function TasksView() {
           {loading ? '불러오는 중...' : `${items.length}개 중 ${doneTasks.length}개 완료${urgent ? ` · 긴급 ${urgent}개` : ''}`}
         </p>
       </div>
+
+      <MITSection tasks={items} toggle={toggle} />
 
       <div style={{
         display: 'flex', gap: 4, marginBottom: 14,

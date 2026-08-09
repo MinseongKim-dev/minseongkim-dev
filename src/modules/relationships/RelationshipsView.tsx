@@ -17,6 +17,20 @@ const REL_COLOR: Record<string, string> = {
   가족: C.rose, 친구: C.teal, 직장동료: C.blue, 멘토: C.violet, 지인: C.amber, 기타: C.sky,
 };
 
+const TIER_META = {
+  1: { label: 'Tier 1', desc: '핵심 (5명)', interval: 14, color: C.rose },
+  2: { label: 'Tier 2', desc: '가까운 (15명)', interval: 30, color: C.amber },
+  3: { label: 'Tier 3', desc: '유지 (50명)', interval: 90, color: C.blue },
+  4: { label: 'Tier 4', desc: '관리 (150명)', interval: 180, color: C.violet },
+} as const;
+
+function contactHealthScore(tier: 1 | 2 | 3 | 4, lastContact?: string): number {
+  const { interval } = TIER_META[tier];
+  if (!lastContact) return 0;
+  const days = Math.floor((Date.now() - new Date(lastContact).getTime()) / 86400000);
+  return Math.max(0, Math.round((1 - days / interval) * 100));
+}
+
 const MEETING_TYPE_LABEL: Record<MeetingType, string> = {
   call: '통화', message: '문자/카톡', meeting: '만남', email: '이메일', other: '기타',
 };
@@ -75,6 +89,7 @@ export function RelationshipsView() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState('친구');
+  const [tier, setTier] = useState<1 | 2 | 3 | 4>(3);
   const [lastContact, setLastContact] = useState('');
   const [notes, setNotes] = useState('');
   const [phone, setPhone] = useState('');
@@ -100,7 +115,7 @@ export function RelationshipsView() {
     if (!name.trim()) return;
     const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
     await add({
-      name: name.trim(), relationship,
+      name: name.trim(), relationship, tier,
       lastContact: lastContact || undefined,
       notes: notes || undefined,
       phone: phone || undefined,
@@ -108,7 +123,7 @@ export function RelationshipsView() {
       birthday: birthday || undefined,
       tags: tags.length ? tags : undefined,
     });
-    setName(''); setRelationship('친구'); setLastContact(''); setNotes('');
+    setName(''); setRelationship('친구'); setTier(3); setLastContact(''); setNotes('');
     setPhone(''); setEmail(''); setBirthday(''); setTagsInput('');
     if (isMobile) setShowForm(false);
   };
@@ -128,8 +143,10 @@ export function RelationshipsView() {
   };
 
   const needsContact = items.filter((c) => {
+    const t = (c.tier ?? 3) as 1 | 2 | 3 | 4;
+    const interval = TIER_META[t].interval;
     const d = daysSince(c.lastContact);
-    return d !== null && d >= 30;
+    return d !== null && d >= interval;
   });
 
   const filteredMeetings = filterContactId
@@ -144,9 +161,14 @@ export function RelationshipsView() {
         <select value={relationship} onChange={(e) => setRelationship(e.target.value)} style={{ ...selectStyle, flex: 1 }}>
           {RELATIONSHIP_TYPES.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
-        <input type="date" value={lastContact} onChange={(e) => setLastContact(e.target.value)}
-          style={{ flex: 1, background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: lastContact ? C.t0 : C.t2, fontSize: 13, fontFamily: font, colorScheme: 'dark' }} />
+        <select value={tier} onChange={(e) => setTier(Number(e.target.value) as 1 | 2 | 3 | 4)} style={{ ...selectStyle, flex: 1 }}>
+          {([1, 2, 3, 4] as const).map((t) => (
+            <option key={t} value={t}>{TIER_META[t].label} — {TIER_META[t].desc}</option>
+          ))}
+        </select>
       </div>
+      <input type="date" value={lastContact} onChange={(e) => setLastContact(e.target.value)}
+        style={{ background: C.bg1, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '8px 12px', color: lastContact ? C.t0 : C.t2, fontSize: 13, fontFamily: font, colorScheme: 'dark', width: '100%', boxSizing: 'border-box' }} />
       <div style={{ display: 'flex', gap: 8 }}>
         <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="전화번호 (선택)" style={{ ...inputStyle, flex: 1 }} />
         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일 (선택)" style={{ ...inputStyle, flex: 1 }} />
@@ -262,7 +284,11 @@ export function RelationshipsView() {
                 const avatarCol = avatarColor(c.name);
                 const initials = c.name.slice(0, 2);
                 const days = daysSince(c.lastContact);
-                const stale = days !== null && days >= 30;
+                const ctier = (c.tier ?? 3) as 1 | 2 | 3 | 4;
+                const tierMeta = TIER_META[ctier];
+                const stale = days !== null && days >= tierMeta.interval;
+                const healthScore = contactHealthScore(ctier, c.lastContact);
+                const healthColor = healthScore >= 70 ? C.teal : healthScore >= 40 ? C.amber : C.rose;
                 const contactMeetings = meetings.filter((m) => m.contactId === c.id).length;
                 return (
                   <div key={c.id} style={{
@@ -275,22 +301,41 @@ export function RelationshipsView() {
                     >
                       <Trash2 size={12} />
                     </button>
-                    <div style={{
-                      width: 44, height: 44, borderRadius: '50%', marginBottom: 12,
-                      background: `linear-gradient(135deg, ${avatarCol}80, ${avatarCol}40)`,
-                      border: `2px solid ${avatarCol}40`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: avatarCol, fontSize: 14, fontWeight: 700,
-                    }}>
-                      {initials}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+                      <div style={{
+                        width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+                        background: `linear-gradient(135deg, ${avatarCol}80, ${avatarCol}40)`,
+                        border: `2px solid ${avatarCol}40`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: avatarCol, fontSize: 14, fontWeight: 700,
+                      }}>
+                        {initials}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ color: C.t0, fontSize: 14, fontWeight: 600 }}>{c.name}</p>
+                        <div style={{ display: 'flex', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
+                          <span style={{
+                            fontSize: 10, fontWeight: 600,
+                            color: relColor, background: `${relColor}18`, borderRadius: 5, padding: '2px 8px',
+                          }}>{c.relationship}</span>
+                          <span style={{
+                            fontSize: 10, fontWeight: 600,
+                            color: tierMeta.color, background: `${tierMeta.color}18`, borderRadius: 5, padding: '2px 8px',
+                          }}>{tierMeta.label}</span>
+                        </div>
+                      </div>
                     </div>
-                    <p style={{ color: C.t0, fontSize: 14, fontWeight: 600 }}>{c.name}</p>
-                    <span style={{
-                      display: 'inline-block', marginTop: 6, fontSize: 10, fontWeight: 600,
-                      color: relColor, background: `${relColor}18`, borderRadius: 5, padding: '2px 8px',
-                    }}>
-                      {c.relationship}
-                    </span>
+
+                    {/* Relationship health bar */}
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                        <span style={{ color: C.t2, fontSize: 9.5 }}>관계 건강도</span>
+                        <span style={{ color: healthColor, fontSize: 9.5, fontFamily: mono }}>{Math.max(0, healthScore)}%</span>
+                      </div>
+                      <div style={{ height: 3, background: C.b1, borderRadius: 2 }}>
+                        <div style={{ height: '100%', borderRadius: 2, width: `${Math.max(0, healthScore)}%`, background: healthColor, transition: 'width 0.3s' }} />
+                      </div>
+                    </div>
 
                     <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
                       {c.phone && (
@@ -326,10 +371,10 @@ export function RelationshipsView() {
                       </div>
                     )}
 
-                    <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       {c.lastContact ? (
                         <p style={{ color: stale ? C.amber : C.t2, fontSize: 10.5, fontFamily: mono }}>
-                          {stale ? `${days}일 전` : `최근 ${days}일 전`}
+                          {stale ? `${days}일 전 (${tierMeta.interval}일 초과)` : `최근 ${days}일 전`}
                         </p>
                       ) : (
                         <p style={{ color: C.t2, fontSize: 10.5 }}>기록 없음</p>
@@ -521,7 +566,7 @@ export function RelationshipsView() {
           {/* Stats */}
           <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 12, padding: '14px 16px' }}>
             <p style={{ color: C.t1, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 12 }}>현황</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               {(() => {
                 const upcoming7 = items.filter((c) => c.birthday && daysUntilBirthday(c.birthday) <= 7).length;
                 return [
@@ -536,6 +581,32 @@ export function RelationshipsView() {
                   <p style={{ color, fontSize: 18, fontWeight: 700, fontFamily: mono }}>{value}</p>
                 </div>
               ))}
+            </div>
+
+            {/* Tier breakdown */}
+            <p style={{ color: C.t2, fontSize: 10.5, marginBottom: 7, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Tier 분류</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {([1, 2, 3, 4] as const).map((t) => {
+                const tm = TIER_META[t];
+                const count = items.filter((c) => (c.tier ?? 3) === t).length;
+                const overdue = items.filter((c) => {
+                  if ((c.tier ?? 3) !== t) return false;
+                  const d = daysSince(c.lastContact);
+                  return d !== null && d >= tm.interval;
+                }).length;
+                return (
+                  <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: tm.color, width: 48, flexShrink: 0 }}>{tm.label}</span>
+                    <div style={{ flex: 1, height: 4, background: C.b0, borderRadius: 2 }}>
+                      <div style={{ height: '100%', width: count > 0 ? '100%' : '0%', background: tm.color, borderRadius: 2, opacity: 0.5 }} />
+                    </div>
+                    <span style={{ color: C.t0, fontSize: 11, fontFamily: mono, width: 20, textAlign: 'right' }}>{count}</span>
+                    {overdue > 0 && (
+                      <span style={{ color: C.amber, fontSize: 10, fontFamily: mono }}>!{overdue}</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 

@@ -454,6 +454,46 @@ export function LearningView() {
                   ))}
                 </div>
 
+                {/* Spaced repetition schedule */}
+                {flashcards.length > 0 && (() => {
+                  const reviewSchedule = [1, 3, 7, 21].map((days) => {
+                    const targetDate = new Date();
+                    targetDate.setDate(targetDate.getDate() + days);
+                    const targetStr = targetDate.toISOString().split('T')[0];
+                    const count = flashcards.filter((c) => c.nextReview > todayForCards && c.nextReview <= targetStr).length;
+                    return { days, count };
+                  });
+                  const overdue = flashcards.filter((c) => c.nextReview < todayForCards).length;
+                  return (
+                    <div style={{
+                      background: '#0D1228', border: `1px solid ${C.violet}20`,
+                      borderLeft: `3px solid ${C.violet}`,
+                      borderRadius: 10, padding: '12px 14px', marginBottom: 14,
+                    }}>
+                      <p style={{ color: C.violet, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+                        망각 곡선 스케줄
+                      </p>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {reviewSchedule.map(({ days, count }) => (
+                          <div key={days} style={{
+                            flex: 1, background: count > 0 ? `${C.violet}12` : C.b0,
+                            border: `1px solid ${count > 0 ? C.violet + '30' : 'transparent'}`,
+                            borderRadius: 8, padding: '8px 6px', textAlign: 'center',
+                          }}>
+                            <p style={{ color: count > 0 ? C.violet : C.t2, fontSize: 16, fontWeight: 700, fontFamily: mono }}>{count}</p>
+                            <p style={{ color: C.t2, fontSize: 9.5, marginTop: 2 }}>{days}일 내</p>
+                          </div>
+                        ))}
+                      </div>
+                      {overdue > 0 && (
+                        <p style={{ color: C.amber, fontSize: 11, marginTop: 8 }}>
+                          기한 초과 {overdue}장 — 즉시 복습하세요
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Start study button */}
                 {dueCards.length > 0 && (
                   <button
