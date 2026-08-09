@@ -3,11 +3,11 @@
  * Uses SUPABASE_SERVICE_ROLE_KEY so it can query all users.
  * No JWT verification required (verify_jwt = false in config.toml).
  */
-import Anthropic from 'npm:@anthropic-ai/sdk'
+import Groq from 'npm:groq-sdk'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
-const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
-const MODEL = 'claude-haiku-4-5-20251001'
+const groq = new Groq({ apiKey: Deno.env.get('GROQ_API_KEY')! })
+const MODEL = 'llama-3.3-70b-versatile'
 
 const OVERALL_PROMPT = `당신은 Node 앱의 AI 어시스턴트입니다.
 아침 브리핑을 아래 JSON 형식으로만 응답하세요:
@@ -175,13 +175,15 @@ async function generateOverallBriefing(
   today: string,
   ctx: Record<string, unknown>,
 ) {
-  const response = await anthropic.messages.create({
+  const response = await groq.chat.completions.create({
     model: MODEL,
     max_tokens: 1024,
-    system: OVERALL_PROMPT,
-    messages: [{ role: 'user', content: JSON.stringify({ today, todayEvents: ctx.todayEvents, pendingTasks: ctx.pendingTasks, recentWorkouts: ctx.recentWorkouts }) }],
+    messages: [
+      { role: 'system', content: OVERALL_PROMPT },
+      { role: 'user', content: JSON.stringify({ today, todayEvents: ctx.todayEvents, pendingTasks: ctx.pendingTasks, recentWorkouts: ctx.recentWorkouts }) },
+    ],
   })
-  const raw = (response.content[0] as { text: string }).text
+  const raw = response.choices[0].message.content ?? ''
   const briefing = parseJson(raw) ?? { summary: raw }
 
   await supabase.from('records').insert({
@@ -213,13 +215,15 @@ async function generateSpecialistInsight(
   if (!sysPrompt) return
 
   const system = SPECIALIST_PROMPT.replace('{systemPrompt}', sysPrompt)
-  const response = await anthropic.messages.create({
+  const response = await groq.chat.completions.create({
     model: MODEL,
     max_tokens: 512,
-    system,
-    messages: [{ role: 'user', content: JSON.stringify({ today, ...dCtx }) }],
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: JSON.stringify({ today, ...dCtx }) },
+    ],
   })
-  const raw = (response.content[0] as { text: string }).text
+  const raw = response.choices[0].message.content ?? ''
   const parsed = parseJson(raw) as Record<string, unknown> | null ?? {}
 
   await supabase.from('records').insert({

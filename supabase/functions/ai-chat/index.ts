@@ -1,8 +1,8 @@
-import Anthropic from 'npm:@anthropic-ai/sdk'
+import Groq from 'npm:groq-sdk'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
-const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
-const MODEL = 'claude-haiku-4-5-20251001'
+const groq = new Groq({ apiKey: Deno.env.get('GROQ_API_KEY')! })
+const MODEL = 'llama-3.3-70b-versatile'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -39,13 +39,12 @@ Deno.serve(async (req) => {
 
   let raw: string
   try {
-    const response = await anthropic.messages.create({
+    const response = await groq.chat.completions.create({
       model: MODEL,
       max_tokens: 4096,
-      system: systemPrompt,
-      messages,
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
     })
-    raw = (response.content[0] as { text: string }).text
+    raw = response.choices[0].message.content ?? ''
   } catch (err) {
     return json({ error: `AI service error: ${err}` }, 502)
   }

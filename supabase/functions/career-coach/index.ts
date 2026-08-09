@@ -1,8 +1,8 @@
-import Anthropic from 'npm:@anthropic-ai/sdk'
+import Groq from 'npm:groq-sdk'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
-const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
-const MODEL = 'claude-haiku-4-5-20251001'
+const groq = new Groq({ apiKey: Deno.env.get('GROQ_API_KEY')! })
+const MODEL = 'llama-3.3-70b-versatile'
 
 const SYSTEM_PROMPT = `당신은 전문 커리어 전략가 AI입니다.
 사용자의 현재 상태와 목표를 분석하여 실용적이고 단계적인 커리어 로드맵을 제시합니다.
@@ -257,13 +257,12 @@ JSON 배열로 응답하세요. 각 항목: type(checkin/deviation_alert/opportu
 }
 
 async function callAI(prompt: string, expectArray = false): Promise<unknown> {
-  const response = await anthropic.messages.create({
+  const response = await groq.chat.completions.create({
     model: MODEL,
     max_tokens: 4096,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: prompt }],
+    messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: prompt }],
   })
-  const raw = (response.content[0] as { text: string }).text
+  const raw = response.choices[0].message.content ?? ''
 
   try {
     if (expectArray && raw.includes('[')) {
