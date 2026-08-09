@@ -1,0 +1,15 @@
+[project]
+# Fill in after creating your Supabase project
+# project_id = "your-project-ref"
+
+[functions.crud]
+verify_jwt = true
+
+[functions.ai-chat]
+verify_jwt = true
+
+[functions.career-coach]
+verify_jwt = true
+
+[functions.proactive]
+verify_jwt = false
