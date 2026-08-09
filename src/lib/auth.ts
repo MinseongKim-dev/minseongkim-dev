@@ -24,7 +24,7 @@ export async function signUp({
   if (error) throw new Error(error.message);
 }
 
-export async function confirmSignUp(_args: { username: string; confirmationCode: string }) {
+export async function confirmSignUp(_: { username: string; confirmationCode: string }) {
   // Supabase handles email confirmation via magic link by default.
   // If using OTP-style confirmation, handle it via verifyOtp.
   // For now this is a no-op — the user clicks the link in the confirmation email.
