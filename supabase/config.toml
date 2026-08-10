@@ -1,6 +1,5 @@
 [project]
-# Fill in after creating your Supabase project
-# project_id = "your-project-ref"
+project_id = "zxxjnygdsfxdbbtwigdu"
 
 [functions.crud]
 verify_jwt = true
