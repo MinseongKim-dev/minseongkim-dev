@@ -11,7 +11,6 @@ a{text-decoration:none;color:inherit}button{cursor:pointer;border:none;backgroun
 input{font-family:inherit;color:inherit}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:2px}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
-@keyframes chatdot{0%,80%,100%{transform:translateY(0);opacity:.35}40%{transform:translateY(-4px);opacity:1}}
 
 /* ── Portfolio ── */
 #portfolio{min-height:100vh}
@@ -127,85 +126,11 @@ h1.hero-h1{font-size:42px;font-weight:700;line-height:1.15;letter-spacing:-0.03e
 .modal-btn.next{border:none;color:#fff}
 .modal-btn.cta{border:none;color:#fff;font-weight:600;text-decoration:none;display:inline-block;padding:8px 20px}
 
-/* ── Node App ── */
-#node-app{display:none;height:100vh;background:#06091A;overflow:hidden}
-#node-app.show{display:flex}
-.n-sidebar{width:218px;background:#090D1F;border-right:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;flex-shrink:0}
-.n-logo-area{padding:18px 16px;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:10px}
-.n-logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#3B8EF0,#7C5CF0);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;box-shadow:0 0 14px rgba(59,142,240,.45);flex-shrink:0}
-.n-brand{color:#DDE5F5;font-size:15px;font-weight:600;letter-spacing:-.3px}
-.n-beta{margin-left:auto;background:rgba(0,204,160,.12);border:1px solid rgba(0,204,160,.25);border-radius:10px;padding:1px 7px;color:#00CCA0;font-size:9.5px;font-family:monospace}
-.n-nav{flex:1;padding:10px 8px;display:flex;flex-direction:column;gap:1px}
-.n-nav-btn{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;width:100%;text-align:left;font-size:13.5px;transition:all .12s;border:none;border-left:2px solid transparent;cursor:pointer}
-.n-nav-btn.active{font-weight:500;border-left-color:var(--nc)}
-.n-nav-bottom{padding:10px 8px;border-top:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;gap:1px}
-.n-header{height:52px;padding:0 24px;display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.04);background:#06091A;flex-shrink:0}
-.n-main-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.n-scroll{flex:1;overflow-y:auto}
-.n-content{padding:26px 28px}
-
-/* dashboard */
-.dash-brief{background:#0D1228;border:1px solid rgba(255,255,255,.08);border-left:3px solid #3B8EF0;border-radius:12px;padding:16px 18px;margin-bottom:16px}
-.dash-alert{background:rgba(239,160,32,.056);border:1px solid rgba(239,160,32,.21);border-radius:10px;padding:9px 14px;margin-bottom:20px;display:flex;align-items:center;gap:9px}
-.domain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
-.dcard{background:#0D1228;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:15px 16px;cursor:pointer;transition:all .14s;position:relative;overflow:hidden}
-.dcard:hover{background:#131B32;border-color:rgba(255,255,255,.16)}
-.dcard-icon-wrap{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.dcard-metric{color:#DDE5F5;font-size:14px;font-weight:600;margin-bottom:4px;font-family:monospace}
-.dcard-sub{color:#556070;font-size:11.5px}
-
-/* career */
-.career-grid{display:grid;grid-template-columns:220px 1fr;gap:16px;margin-bottom:16px}
-.career-card{background:#0D1228;border:1px solid rgba(255,255,255,.08);border-radius:12px}
-.gap-bar-wrap{margin-bottom:9px}
-.gap-bar-hdr{display:flex;justify-content:space-between;margin-bottom:3px}
-.gap-bar-lbl{color:#556070;font-size:10.5px}
-.gap-bar-val{color:#DDE5F5;font-size:10.5px;font-family:monospace}
-.gap-bar-track{height:4px;background:rgba(255,255,255,.04);border-radius:2px}
-.gap-bar-fill{height:100%;border-radius:2px}
-.career-phases{background:#0D1228;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px 20px}
-.phase-btn{width:100%;display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:8px;text-align:left;font-size:13.5px;background:none;border:none;cursor:pointer;border-left:2px solid transparent;transition:all .15s}
-.phase-actions{padding:10px 14px 14px 34px;display:flex;flex-direction:column;gap:7px}
-.phase-action-row{display:flex;align-items:center;gap:8px;font-size:12.5px}
-
-/* tasks */
-.task-item{background:#0D1228;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 16px;cursor:pointer;transition:all .14s;display:flex;align-items:center;gap:12px;margin-bottom:8px}
-.task-item.done{background:#090D1F;border-color:rgba(255,255,255,.04)}
-.task-title{color:#DDE5F5;font-size:13.5px;flex:1}
-.task-item.done .task-title{text-decoration:line-through;color:#556070}
-.task-due{font-size:11px;color:#556070;font-family:monospace}
-.task-tag{font-size:10px;font-weight:600;border-radius:5px;padding:2px 8px}
-
-/* chat */
-.chat-panel{width:340px;background:#090D1F;border-left:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;flex-shrink:0}
-.chat-hdr{padding:16px;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:10px}
-.chat-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3B8EF0,#7C5CF0);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
-.chat-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
-.chat-row{display:flex;gap:7px;align-items:flex-end}
-.chat-row.user{flex-direction:row-reverse}
-.chat-bubble{max-width:82%;padding:9px 12px;font-size:12.5px;line-height:1.6;color:#DDE5F5}
-.chat-bubble.ai{border-radius:12px 12px 12px 4px;background:#131B32;border:1px solid rgba(255,255,255,.08)}
-.chat-bubble.user{border-radius:12px 12px 4px 12px;background:rgba(59,142,240,.157);border:1px solid rgba(59,142,240,.27)}
-.chat-quick{padding:8px 12px;border-top:1px solid rgba(255,255,255,.04);display:flex;gap:6px;flex-wrap:wrap}
-.chat-quick-btn{background:#131B32;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:4px 10px;color:#556070;font-size:11px;cursor:pointer;font-family:inherit;transition:all .12s}
-.chat-quick-btn:hover{color:#DDE5F5;border-color:rgba(255,255,255,.16)}
-.chat-input-area{padding:10px 12px;border-top:1px solid rgba(255,255,255,.04);display:flex;gap:8px;align-items:center}
-.chat-input{flex:1;background:#0D1228;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px 12px;font-size:12.5px;outline:none}
-.chat-input:focus{border-color:rgba(59,142,240,.4)}
-.chat-send{width:32px;height:32px;border-radius:8px;background:#3B8EF0;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;border:none}
-
-/* transition */
-#transition{position:fixed;inset:0;z-index:200;background:#000;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .35s}
-#transition.show{opacity:1}
-
 @media(max-width:640px){
   .p-hero,.p-section{padding-left:20px!important;padding-right:20px!important}
   h1.hero-h1{font-size:28px!important}
   .stack-grid,.contact-grid{grid-template-columns:1fr!important}
-  .domain-grid{grid-template-columns:1fr 1fr!important}
-  .career-grid{grid-template-columns:1fr!important}
   .chal-grid{grid-template-columns:1fr!important}
-  #node-app{height:auto;min-height:100vh}
 }
 </style>
 </head>
@@ -277,24 +202,6 @@ h1.hero-h1{font-size:42px;font-weight:700;line-height:1.15;letter-spacing:-0.03e
   </footer>
 </div>
 
-<!-- Node App Demo -->
-<div id="node-app">
-  <div class="n-sidebar">
-    <div class="n-logo-area">
-      <div class="n-logo">N</div>
-      <span class="n-brand">Node</span>
-      <span class="n-beta">BETA</span>
-    </div>
-    <nav class="n-nav" id="n-nav"></nav>
-    <div class="n-nav-bottom" id="n-nav-bottom"></div>
-  </div>
-  <div class="n-main-wrap">
-    <div class="n-header" id="n-header"></div>
-    <div class="n-scroll"><div class="n-content" id="n-view"></div></div>
-  </div>
-  <div id="chat-panel-wrap"></div>
-</div>
-
 <!-- Modal -->
 <div id="modal">
   <div class="modal-box">
@@ -314,8 +221,6 @@ h1.hero-h1{font-size:42px;font-weight:700;line-height:1.15;letter-spacing:-0.03e
   </div>
 </div>
 
-<!-- Transition -->
-<div id="transition"><div id="transition-text" style="color:#3B8EF0;font-family:monospace;font-size:12px;letter-spacing:.12em;opacity:.8"></div></div>
 
 <script>
 // ─── DATA ────────────────────────────────────────────────────────
@@ -328,6 +233,7 @@ const PROJECTS = [
     accent:"#3B82F6",
     tags:["AWS SAM","Python Lambda","Amazon Bedrock","DynamoDB","Cognito","React","TypeScript","D3.js"],
     hasApp:true,
+    appUrl:"https://minseongkim.me",
     slides:[
       { eyebrow:"문제 정의", title:"삶의 모든 영역이 서로 모른다",
         body:"7개의 앱이 각자 따로 작동한다. AI는 내 맥락을 전혀 모른 채 도움을 준다. 관리를 위해 관리를 해야 하는 상황 — 관리 자체가 일이 된다.",
@@ -434,61 +340,6 @@ const PROJECTS = [
   }
 ];
 
-const NAV_ITEMS = [
-  {id:"dashboard",label:"대시보드",color:"#3B8EF0",
-   iconP:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>'},
-  {id:"schedule",label:"일정",color:"#3B8EF0",
-   iconP:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'},
-  {id:"tasks",label:"할 일",color:"#7C5CF0",
-   iconP:'<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'},
-  {id:"finance",label:"재정",color:"#EFA020",
-   iconP:'<line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
-  {id:"health",label:"건강",color:"#00CCA0",
-   iconP:'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'},
-  {id:"learning",label:"학습",color:"#58AEFF",
-   iconP:'<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>'},
-  {id:"career",label:"커리어",color:"#9B7CF5",
-   iconP:'<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>'},
-  {id:"relations",label:"관계",color:"#F05472",
-   iconP:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'},
-];
-
-const DOMAIN_CARDS = [
-  {id:"schedule",label:"일정",color:"#3B8EF0",metric:"오늘 3개 일정",sub:"다음 — 10:00 팀 스탠드업",status:"ok",
-   iconP:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'},
-  {id:"tasks",label:"할 일",color:"#7C5CF0",metric:"12개 중 5 완료",sub:"마감 임박 2개",status:"warn",
-   iconP:'<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'},
-  {id:"finance",label:"재정",color:"#EFA020",metric:"₩412,000 지출",sub:"월 예산의 68%",status:"ok",
-   iconP:'<line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
-  {id:"health",label:"건강",color:"#00CCA0",metric:"3일 운동 없음",sub:"오늘 목표: 30분",status:"alert",
-   iconP:'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'},
-  {id:"learning",label:"학습",color:"#58AEFF",metric:"TypeScript 3/10",sub:"이번 주 2.5시간",status:"ok",
-   iconP:'<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>'},
-  {id:"career",label:"커리어",color:"#9B7CF5",metric:"준비도 64%",sub:"Phase 1 진행 중",status:"ok",
-   iconP:'<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>'},
-  {id:"relations",label:"관계",color:"#F05472",metric:"2명 미연락",sub:"민수님 60일 경과",status:"alert",
-   iconP:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'},
-];
-
-const RADAR_DATA=[{s:"기술역량",v:67},{s:"소프트스킬",v:50},{s:"교육/자격",v:83},{s:"경험",v:67},{s:"네트워크",v:33},{s:"시장적합",v:83}];
-const GAP_BARS=[{label:"기술 역량",score:67,color:"#3B8EF0"},{label:"소프트 스킬",score:50,color:"#7C5CF0"},{label:"교육/자격",score:83,color:"#00CCA0"},{label:"경험",score:67,color:"#58AEFF"},{label:"네트워크",score:33,color:"#F05472"},{label:"시장 적합",score:83,color:"#EFA020"}];
-const PHASES=[
-  {name:"기반 다지기",dur:"1~3개월",active:true,actions:["TypeScript 심화 학습 — 진행 중","기술 블로그 개설","프론트엔드 밋업 참여"]},
-  {name:"역량 확장",dur:"4~6개월",active:false,actions:["성능 최적화 프로젝트","디자인 시스템 기여","주니어 멘토링"]},
-  {name:"포지셔닝",dur:"7~10개월",active:false,actions:["컨퍼런스 발표","테크 리드 역할","이력서/포트폴리오 정리"]},
-];
-const INIT_TASKS=[
-  {title:"기획서 초안 작성",tag:"urgent",tagColor:"#F05472",due:"내일",done:false},
-  {title:"API 명세 리뷰",tag:"high",tagColor:"#EFA020",due:"이번 주",done:false},
-  {title:"디자인 리뷰 참석",tag:"medium",tagColor:"#58AEFF",due:"오늘 14:00",done:true},
-  {title:"주간 회고 작성",tag:"low",tagColor:"#00CCA0",due:"이번 주",done:false},
-  {title:"배포 파이프라인 점검",tag:"high",tagColor:"#EFA020",due:"오늘",done:false},
-];
-const CHAT_INIT=[
-  {role:"ai",text:"안녕하세요! 오늘 일정 3개, 마감 임박 태스크 2개가 있어요. 기획서 초안 마감이 내일이라 오전 집중 시간을 먼저 확보하는 걸 추천해요."},
-  {role:"user",text:"이번 달 카페 지출 얼마야?"},
-  {role:"ai",text:"이번 달 카페 지출은 ₩87,000이에요. 예산의 87%를 썼네요. 남은 기간 주 2회 이하로 조절하면 예산 내로 마무리할 수 있어요."},
-];
 const STACK_GROUPS=[
   {label:"Cloud / Infra",items:["AWS Lambda","S3 + CloudFront","DynamoDB","Amazon Bedrock","Amazon Cognito","AWS SAM"],note:"서버리스 아키텍처 중심"},
   {label:"Containers",items:["Docker","Docker Compose","Prometheus","Grafana"],note:"DevOps 실전 스택"},
@@ -499,11 +350,6 @@ const STACK_GROUPS=[
 ];
 
 // ─── STATE ───────────────────────────────────────────────────────
-let nodeView = 'dashboard';
-let chatOpen = false;
-let openPhase = 0;
-let tasks = INIT_TASKS.map(t=>({...t}));
-let chatMsgs = [...CHAT_INIT];
 let modalProj = null, modalSlide = 0;
 
 // ─── HELPERS ─────────────────────────────────────────────────────
@@ -514,39 +360,6 @@ function dot(color, glow=false) {
   return `<div style="width:7px;height:7px;border-radius:50%;background:${color};flex-shrink:0;${glow?`box-shadow:0 0 7px ${color}`:''}"></div>`;
 }
 
-// ─── RADAR CHART ─────────────────────────────────────────────────
-function radarSVG() {
-  const d=RADAR_DATA, n=d.length, cx=110, cy=92, r=64;
-  const angles=d.map((_,i)=>(i/n)*2*Math.PI - Math.PI/2);
-  const pt=(frac,i)=>[cx+frac*r*Math.cos(angles[i]), cy+frac*r*Math.sin(angles[i])];
-  const poly=(pts,stroke,fill,sw=1)=>`<polygon points="${pts.map(p=>p.join(',')).join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"/>`;
-  const gridPts=frac=>angles.map((_,i)=>pt(frac,i));
-  let out=`<svg width="100%" height="185" viewBox="0 0 220 185">`;
-  [.25,.5,.75,1].forEach(f=>out+=poly(gridPts(f),'rgba(255,255,255,0.07)','none'));
-  angles.forEach((a,i)=>out+=`<line x1="${cx}" y1="${cy}" x2="${(cx+r*Math.cos(a)).toFixed(1)}" y2="${(cy+r*Math.sin(a)).toFixed(1)}" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>`);
-  const dataPts=d.map((p,i)=>pt(p.v/100,i));
-  out+=poly(dataPts,'#9B7CF5','rgba(155,124,245,0.18)',2);
-  d.forEach((p,i)=>{
-    const [lx,ly]=[cx+(r+18)*Math.cos(angles[i]), cy+(r+18)*Math.sin(angles[i])];
-    const anchor=lx<cx-4?'end':lx>cx+4?'start':'middle';
-    out+=`<text x="${lx.toFixed(1)}" y="${(ly+4).toFixed(1)}" text-anchor="${anchor}" fill="#556070" font-size="9.5" font-family="system-ui,sans-serif">${p.s}</text>`;
-  });
-  out+=`</svg>`;
-  return out;
-}
-
-// ─── CIRCULAR GAUGE ──────────────────────────────────────────────
-function circleGauge(value, color='#9B7CF5', size=124) {
-  const r=48, circ=2*Math.PI*r, off=circ-(value/100)*circ;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 124 124">
-    <circle cx="62" cy="62" r="${r}" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="9"/>
-    <circle cx="62" cy="62" r="${r}" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round"
-      stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 62 62)"
-      style="filter:drop-shadow(0 0 10px ${color}90)"/>
-    <text x="62" y="57" text-anchor="middle" fill="#DDE5F5" font-size="24" font-weight="700" font-family="system-ui">${value}</text>
-    <text x="62" y="72" text-anchor="middle" fill="#556070" font-size="9.5" font-family="system-ui">준비도 %</text>
-  </svg>`;
-}
 
 // ─── PORTFOLIO RENDER ─────────────────────────────────────────────
 function renderProjects() {
@@ -701,8 +514,7 @@ function renderModal() {
   const isLast=modalSlide===total-1;
   if(isLast) {
     if(modalProj.hasApp) {
-      nw.innerHTML=`<button class="modal-btn cta" id="modal-cta" style="background:${acc}">앱 열기 ↗</button>`;
-      document.getElementById('modal-cta').addEventListener('click',()=>{closeModal();setTimeout(goToNode,80);});
+      nw.innerHTML=`<a href="${modalProj.appUrl}" target="_blank" rel="noopener" class="modal-btn cta" style="background:${acc}">앱 열기 ↗</a>`;
     } else {
       nw.innerHTML=`<a href="${modalProj.deployUrl}" target="_blank" rel="noopener" class="modal-btn cta" style="background:${acc}">배포 사이트 ↗</a>`;
     }
@@ -712,300 +524,6 @@ function renderModal() {
   }
 }
 
-// ─── TRANSITIONS ─────────────────────────────────────────────────
-function goToNode() {
-  const tr=document.getElementById('transition');
-  document.getElementById('transition-text').textContent='— entering node —';
-  tr.classList.add('show');
-  setTimeout(()=>{
-    document.getElementById('portfolio').style.display='none';
-    const na=document.getElementById('node-app');
-    na.style.display='flex';
-    renderNodeSidebar();
-    renderNodeHeader();
-    renderNodeView();
-    tr.classList.remove('show');
-  },400);
-}
-function goToPortfolio() {
-  const tr=document.getElementById('transition');
-  document.getElementById('transition-text').textContent='— returning —';
-  tr.classList.add('show');
-  setTimeout(()=>{
-    document.getElementById('node-app').style.display='none';
-    document.getElementById('portfolio').style.display='';
-    tr.classList.remove('show');
-  },400);
-}
-
-// ─── NODE APP ────────────────────────────────────────────────────
-function renderNodeSidebar() {
-  const nav=document.getElementById('n-nav');
-  nav.innerHTML=NAV_ITEMS.map(item=>{
-    const active=nodeView===item.id;
-    return `<button class="n-nav-btn${active?' active':''}" data-view="${item.id}"
-      style="--nc:${item.color};background:${active?item.color+'18':'transparent'};color:${active?'#DDE5F5':'#556070'}">
-      ${svg(item.iconP,14,active?item.color:'#556070')}
-      ${item.label}
-    </button>`;
-  }).join('');
-  nav.querySelectorAll('.n-nav-btn').forEach(b=>b.addEventListener('click',()=>{
-    nodeView=b.dataset.view;renderNodeSidebar();renderNodeHeader();renderNodeView();
-  }));
-
-  const nb=document.getElementById('n-nav-bottom');
-  const chatActive=chatOpen;
-  nb.innerHTML=`
-    <button class="n-nav-btn${chatActive?' active':''}" id="sidebar-chat"
-      style="background:${chatActive?'rgba(59,142,240,0.094)':'transparent'};color:${chatActive?'#DDE5F5':'#556070'};border-left-color:${chatActive?'#3B8EF0':'transparent'}">
-      ${svg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',14,chatActive?'#3B8EF0':'#556070')}
-      AI 어시스턴트
-      <span style="margin-left:auto;width:6px;height:6px;border-radius:50%;background:#00CCA0;box-shadow:0 0 6px #00CCA0;flex-shrink:0"></span>
-    </button>
-    <button class="n-nav-btn" id="sidebar-back" style="color:#556070;opacity:.6;margin-top:4px;font-size:12.5px">
-      ${svg('<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',13,'#556070')}
-      포트폴리오로
-    </button>`;
-  document.getElementById('sidebar-chat').addEventListener('click',()=>{chatOpen=!chatOpen;renderChat();renderNodeSidebar();});
-  document.getElementById('sidebar-back').addEventListener('click',goToPortfolio);
-}
-
-function renderNodeHeader() {
-  const item=NAV_ITEMS.find(n=>n.id===nodeView);
-  document.getElementById('n-header').innerHTML=`
-    ${svg(item.iconP,14,item.color)}
-    <span style="color:#DDE5F5;font-size:14px;font-weight:600;margin-left:8px">${item.label}</span>
-    <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
-      <button style="position:relative;color:#556070;background:none;border:none;display:flex;cursor:pointer" id="hdr-bell">
-        ${svg('<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',15,'#556070')}
-        <div style="position:absolute;top:-2px;right:-2px;width:7px;height:7px;border-radius:50%;background:#F05472;border:1.5px solid #06091A"></div>
-      </button>
-      <button id="hdr-chat" style="display:flex;align-items:center;gap:6px;padding:4px 12px;background:${chatOpen?'rgba(59,142,240,0.125)':'#0D1228'};border:1px solid ${chatOpen?'#3B8EF0':'rgba(255,255,255,0.08)'};border-radius:20px;color:${chatOpen?'#3B8EF0':'#556070'};font-size:12px;cursor:pointer">
-        ${svg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',12,chatOpen?'#3B8EF0':'#556070')}
-        AI 채팅
-      </button>
-      <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3B8EF0,#7C5CF0);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600">민</div>
-    </div>`;
-  document.getElementById('hdr-chat').addEventListener('click',()=>{chatOpen=!chatOpen;renderChat();renderNodeSidebar();renderNodeHeader();});
-}
-
-// ─── VIEWS ───────────────────────────────────────────────────────
-function renderNodeView() {
-  const el=document.getElementById('n-view');
-  if(nodeView==='dashboard') el.innerHTML=dashboardHTML();
-  else if(nodeView==='career') el.innerHTML=careerHTML();
-  else if(nodeView==='tasks') {el.innerHTML=tasksHTML();attachTaskEvents();}
-  else {
-    const item=NAV_ITEMS.find(n=>n.id===nodeView);
-    el.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;height:60vh">
-      ${svg(item.iconP,40,`${item.color}60`)}
-      <p style="color:#556070;font-size:14px">이 모듈은 개발 중이에요.</p>
-    </div>`;
-  }
-
-  if(nodeView==='career') attachCareerEvents();
-  if(nodeView==='dashboard') {
-    document.querySelectorAll('.dcard').forEach(c=>{
-      c.addEventListener('click',()=>{nodeView=c.dataset.domain;renderNodeSidebar();renderNodeHeader();renderNodeView();});
-    });
-  }
-}
-
-function dashboardHTML() {
-  const today=new Date().toLocaleDateString('ko-KR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  return `
-    <div style="margin-bottom:22px">
-      <div style="color:#556070;font-size:11px;font-family:monospace;margin-bottom:5px">${today}</div>
-      <h1 style="color:#DDE5F5;font-size:22px;font-weight:700;letter-spacing:-.4px">안녕하세요, 민성님 👋</h1>
-    </div>
-    <div class="dash-brief">
-      <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
-        ${svg('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',12,'#3B8EF0')}
-        <span style="color:#3B8EF0;font-size:10.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase">오늘의 브리핑</span>
-      </div>
-      <p style="color:#DDE5F5;font-size:13px;line-height:1.65;margin-bottom:12px">일정 3개, 마감 임박 태스크 2개가 있어요. <strong style="color:#fff">기획서 초안</strong> 마감이 내일이에요. 오전 집중 시간을 먼저 확보하는 게 좋을 것 같아요.</p>
-      <div style="display:flex;gap:7px;flex-wrap:wrap">
-        ${["10:00 팀 스탠드업","14:00 디자인 리뷰","18:30 헬스장"].map(e=>`<span style="background:#131B32;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:3px 9px;color:#556070;font-size:11px;font-family:monospace">${e}</span>`).join('')}
-      </div>
-    </div>
-    <div class="dash-alert">
-      ${svg('<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',13,'#EFA020')}
-      <span style="color:rgba(239,160,32,.82);font-size:12.5px;flex:1">건강: 3일째 운동 기록이 없어요. 오늘 20분 산책을 일정에 잡아드릴까요?</span>
-      <button style="color:#EFA020;font-size:12px;background:none;border:none;cursor:pointer">잡아줘 →</button>
-    </div>
-    <div class="domain-grid">${DOMAIN_CARDS.map(c=>{
-      const sc=c.status==='alert'?'#F05472':c.status==='warn'?'#EFA020':'#00CCA0';
-      return `<div class="dcard" data-domain="${c.id}">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
-          <div style="display:flex;align-items:center;gap:7px">
-            <div class="dcard-icon-wrap" style="background:${c.color}18">${svg(c.iconP,13,c.color)}</div>
-            <span style="color:#556070;font-size:11.5px;font-weight:500">${c.label}</span>
-          </div>
-          ${dot(sc,c.status==='alert')}
-        </div>
-        <div class="dcard-metric">${c.metric}</div>
-        <div class="dcard-sub">${c.sub}</div>
-        <div style="position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,${c.color}70,transparent);opacity:0;transition:opacity .2s"></div>
-      </div>`;
-    }).join('')}</div>`;
-}
-
-function careerHTML() {
-  const phHTML=PHASES.map((ph,i)=>`
-    <div style="border:1px solid ${ph.active?'rgba(255,255,255,.16)':'rgba(255,255,255,.04)'};border-radius:10px;overflow:hidden;margin-bottom:8px">
-      <button class="phase-btn" data-phase="${i}"
-        style="color:${ph.active?'#DDE5F5':'#556070'};font-weight:${ph.active?600:400};border-left-color:${ph.active?'#7C5CF0':'transparent'};background:${ph.active?'rgba(124,92,240,.062)':'transparent'}">
-        ${dot(ph.active?'#7C5CF0':'#253040',ph.active)}
-        ${ph.name}
-        <span style="color:#253040;font-size:11px;font-family:monospace;margin-left:4px">${ph.dur}</span>
-        <span style="margin-left:auto;font-size:10.5px;color:${ph.active?'#7C5CF0':'#253040'};font-weight:500">${ph.active?'● 진행중':'대기'}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#253040" stroke-width="2" class="phase-chev" data-phase="${i}" style="transition:transform .2s;transform:${openPhase===i?'rotate(90deg)':'rotate(0)'}"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
-      ${openPhase===i?`<div class="phase-actions">${ph.actions.map((a,j)=>`
-        <div class="phase-action-row" style="color:${ph.active&&j===0?'#DDE5F5':'#556070'}">
-          <div style="width:4px;height:4px;border-radius:50%;background:${ph.active&&j===0?'#7C5CF0':'#253040'};flex-shrink:0"></div>
-          ${a}
-          ${ph.active&&j===0?'<span style="margin-left:auto;font-size:10px;color:#00CCA0;background:rgba(0,204,160,.094);border-radius:4px;padding:2px 7px">진행중</span>':''}
-        </div>`).join('')}</div>`:''}
-    </div>`).join('');
-
-  return `
-    <div style="margin-bottom:22px">
-      <div style="color:#556070;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;font-family:monospace;margin-bottom:5px">AI 커리어 코치</div>
-      <h1 style="color:#DDE5F5;font-size:21px;font-weight:700;letter-spacing:-.4px">프론트엔드 시니어 개발자</h1>
-      <p style="color:#556070;font-size:12.5px;margin-top:4px">예상 기간 8~12개월 · 현직 성장형 경로</p>
-    </div>
-    <div class="career-grid">
-      <div class="career-card" style="padding:20px 18px;display:flex;flex-direction:column;align-items:center;gap:14px">
-        ${circleGauge(64)}
-        <div style="width:100%">${GAP_BARS.map(b=>`
-          <div class="gap-bar-wrap">
-            <div class="gap-bar-hdr"><span class="gap-bar-lbl">${b.label}</span><span class="gap-bar-val">${b.score}%</span></div>
-            <div class="gap-bar-track"><div class="gap-bar-fill" style="width:${b.score}%;background:${b.color};box-shadow:0 0 5px ${b.color}60"></div></div>
-          </div>`).join('')}</div>
-      </div>
-      <div class="career-card" style="padding:18px 20px">
-        <div style="color:#556070;font-size:11px;font-weight:500;margin-bottom:2px">6차원 갭 분석</div>
-        ${radarSVG()}
-        <div style="background:rgba(124,92,240,.075);border:1px solid rgba(124,92,240,.188);border-radius:8px;padding:9px 12px;font-size:12px;color:rgba(124,92,240,.878);line-height:1.5;margin-top:8px">
-          💡 네트워크(33%) 갭이 가장 커요. 기술 블로그 + 밋업 참여부터 시작하면 빠르게 올릴 수 있어요.
-        </div>
-      </div>
-    </div>
-    <div class="career-phases">
-      <div style="color:#556070;font-size:11px;font-weight:500;margin-bottom:14px">준비 로드맵</div>
-      ${phHTML}
-    </div>`;
-}
-
-function attachCareerEvents() {
-  document.querySelectorAll('.phase-btn').forEach(b=>{
-    b.addEventListener('click',()=>{
-      const i=+b.dataset.phase;
-      openPhase=openPhase===i?-1:i;
-      renderNodeView();
-    });
-  });
-}
-
-function tasksHTML() {
-  return `
-    <div style="margin-bottom:22px">
-      <h1 style="color:#DDE5F5;font-size:20px;font-weight:700;letter-spacing:-.4px">할 일</h1>
-      <p style="color:#556070;font-size:12.5px;margin-top:4px">12개 중 5개 완료 · 마감 임박 2개</p>
-    </div>
-    <div id="task-list">${tasks.map((t,i)=>`
-      <div class="task-item${t.done?' done':''}" data-task="${i}">
-        ${t.done
-          ? svg('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',16,'#00CCA0')
-          : `<div style="width:16px;height:16px;border-radius:50%;border:1.5px solid #253040;flex-shrink:0"></div>`}
-        <span class="task-title">${t.title}</span>
-        <span class="task-due">${t.due}</span>
-        <span class="task-tag" style="color:${t.tagColor};background:${t.tagColor}18">${t.tag}</span>
-      </div>`).join('')}</div>`;
-}
-
-function attachTaskEvents() {
-  document.querySelectorAll('.task-item').forEach(el=>{
-    el.addEventListener('click',()=>{
-      const i=+el.dataset.task;
-      tasks[i].done=!tasks[i].done;
-      document.getElementById('task-list').innerHTML=tasks.map((t,j)=>`
-        <div class="task-item${t.done?' done':''}" data-task="${j}">
-          ${t.done
-            ? svg('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',16,'#00CCA0')
-            : `<div style="width:16px;height:16px;border-radius:50%;border:1.5px solid #253040;flex-shrink:0"></div>`}
-          <span class="task-title">${t.title}</span>
-          <span class="task-due">${t.due}</span>
-          <span class="task-tag" style="color:${t.tagColor};background:${t.tagColor}18">${t.tag}</span>
-        </div>`).join('');
-      attachTaskEvents();
-    });
-  });
-}
-
-// ─── CHAT ────────────────────────────────────────────────────────
-function renderChat() {
-  const wrap=document.getElementById('chat-panel-wrap');
-  if(!chatOpen){wrap.innerHTML='';return;}
-  wrap.innerHTML=`
-    <div class="chat-panel">
-      <div class="chat-hdr">
-        <div class="chat-avatar">N</div>
-        <div style="flex:1">
-          <div style="color:#DDE5F5;font-size:13.5px;font-weight:600">Node AI</div>
-          <div style="display:flex;align-items:center;gap:5px;margin-top:1px">
-            <div style="width:5px;height:5px;border-radius:50%;background:#00CCA0;box-shadow:0 0 5px #00CCA0"></div>
-            <span style="color:#00CCA0;font-size:10px">온라인</span>
-          </div>
-        </div>
-        <button id="chat-close" style="color:#556070;background:none;border:none;cursor:pointer;display:flex">
-          ${svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',14,'#556070')}
-        </button>
-      </div>
-      <div class="chat-msgs" id="chat-msgs">${chatMsgs.map(m=>`
-        <div class="chat-row ${m.role}">
-          ${m.role==='ai'?`<div class="chat-avatar" style="width:20px;height:20px;font-size:9px">N</div>`:''}
-          <div class="chat-bubble ${m.role}">${m.text}</div>
-        </div>`).join('')}
-      </div>
-      <div class="chat-quick">
-        ${["오늘 요약","일정 잡아줘","운동 추천","커리어 체크","지출 분석"].map(q=>
-          `<button class="chat-quick-btn" data-q="${q}">${q}</button>`).join('')}
-      </div>
-      <div class="chat-input-area">
-        <input class="chat-input" id="chat-input" placeholder="메시지를 입력하세요..." />
-        <button class="chat-send" id="chat-send">${svg('<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',13,'#fff')}</button>
-      </div>
-    </div>`;
-
-  document.getElementById('chat-close').addEventListener('click',()=>{chatOpen=false;renderChat();renderNodeSidebar();renderNodeHeader();});
-  document.querySelectorAll('.chat-quick-btn').forEach(b=>b.addEventListener('click',()=>sendChat(b.dataset.q)));
-  document.getElementById('chat-send').addEventListener('click',()=>{
-    const inp=document.getElementById('chat-input');
-    sendChat(inp.value);inp.value='';
-  });
-  document.getElementById('chat-input').addEventListener('keydown',e=>{
-    if(e.key==='Enter'&&!e.shiftKey){const inp=e.target;sendChat(inp.value);inp.value='';}
-  });
-  scrollChatBottom();
-}
-
-function sendChat(text) {
-  const msg=text.trim();
-  if(!msg) return;
-  chatMsgs.push({role:'user',text:msg});
-  renderChat();
-  setTimeout(()=>{
-    chatMsgs.push({role:'ai',text:'분석 중이에요... (실제 서비스에서는 AWS Bedrock을 통해 Claude가 응답해요.)'});
-    renderChat();
-  },1100);
-}
-
-function scrollChatBottom() {
-  const msgs=document.getElementById('chat-msgs');
-  if(msgs) msgs.scrollTop=msgs.scrollHeight;
-}
 
 // ─── MODAL EVENTS ────────────────────────────────────────────────
 document.getElementById('modal-close').addEventListener('click',closeModal);
