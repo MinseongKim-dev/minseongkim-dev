@@ -5,9 +5,10 @@ import styles from './Auth.module.css';
 
 interface LoginFormProps {
   onSwitchToSignup: () => void;
+  standalone?: boolean;
 }
 
-export function LoginForm({ onSwitchToSignup }: LoginFormProps) {
+export function LoginForm({ onSwitchToSignup, standalone = true }: LoginFormProps) {
   const { refresh } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,55 +32,55 @@ export function LoginForm({ onSwitchToSignup }: LoginFormProps) {
     }
   };
 
-  return (
-    <div className={styles.authPage}>
-      <div className={styles.authCard}>
-        <div className={styles.authLogo}>N</div>
-        <h1 className={styles.authTitle}>Node</h1>
-        <p className={styles.authSubtitle}>로그인하여 시작하세요</p>
+  const card = (
+    <div className={styles.authCard}>
+      <div className={styles.authLogo}>N</div>
+      <h1 className={styles.authTitle}>Node</h1>
+      <p className={styles.authSubtitle}>로그인하여 시작하세요</p>
 
-        <form className={styles.form} onSubmit={handleSubmit}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="login-email">이메일</label>
-            <input
-              id="login-email"
-              type="email"
-              className={styles.input}
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              autoComplete="email"
-              required
-            />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="login-password">비밀번호</label>
-            <input
-              id="login-password"
-              type="password"
-              className={styles.input}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              required
-            />
-          </div>
+      <form className={styles.form} onSubmit={handleSubmit}>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="login-email">이메일</label>
+          <input
+            id="login-email"
+            type="email"
+            className={styles.input}
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="your@email.com"
+            autoComplete="email"
+            required
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="login-password">비밀번호</label>
+          <input
+            id="login-password"
+            type="password"
+            className={styles.input}
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="current-password"
+            required
+          />
+        </div>
 
-          {error && <p className={styles.error}>{error}</p>}
+        {error && <p className={styles.error}>{error}</p>}
 
-          <button type="submit" className={styles.submitButton} disabled={isLoading}>
-            {isLoading ? '로그인 중...' : '로그인'}
-          </button>
-        </form>
+        <button type="submit" className={styles.submitButton} disabled={isLoading}>
+          {isLoading ? '로그인 중...' : '로그인'}
+        </button>
+      </form>
 
-        <p className={styles.switchRow}>
-          계정이 없으신가요?{' '}
-          <button className={styles.switchLink} onClick={onSwitchToSignup} type="button">
-            회원가입
-          </button>
-        </p>
-      </div>
+      <p className={styles.switchRow}>
+        계정이 없으신가요?{' '}
+        <button className={styles.switchLink} onClick={onSwitchToSignup} type="button">
+          회원가입
+        </button>
+      </p>
     </div>
   );
+
+  return standalone ? <div className={styles.authPage}>{card}</div> : card;
 }

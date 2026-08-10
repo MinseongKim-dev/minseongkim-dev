@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useAuth } from '../../contexts/useAuth';
-import { LoginForm } from './LoginForm';
-import { SignupForm } from './SignupForm';
+import { PortfolioPage } from '../../pages/portfolio/PortfolioPage';
+import { AuthModal } from './AuthModal';
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -9,7 +9,7 @@ interface AuthGuardProps {
 
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, isLoading } = useAuth();
-  const [showSignup, setShowSignup] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -20,10 +20,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }
 
   if (!user) {
-    if (showSignup) {
-      return <SignupForm onSwitchToLogin={() => setShowSignup(false)} />;
-    }
-    return <LoginForm onSwitchToSignup={() => setShowSignup(true)} />;
+    return (
+      <>
+        <PortfolioPage onLoginClick={() => setModalOpen(true)} />
+        <AuthModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      </>
+    );
   }
 
   return <>{children}</>;
