@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/((?!portfolio\\.html$).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

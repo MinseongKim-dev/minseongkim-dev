@@ -1,0 +1,17 @@
+name: Daily Briefing
+
+on:
+  schedule:
+    - cron: '0 22 * * *'   # 07:00 KST = 22:00 UTC
+  workflow_dispatch:
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger proactive briefing
+        run: |
+          curl -sS -f -X POST \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/proactive" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"

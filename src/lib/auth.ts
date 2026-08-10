@@ -1,50 +1,45 @@
-import { Amplify } from 'aws-amplify';
-import { fetchAuthSession, signIn, signOut, signUp, confirmSignUp, getCurrentUser } from 'aws-amplify/auth';
+import { supabase } from './supabase';
 
-const USER_POOL_ID = import.meta.env.VITE_COGNITO_USER_POOL_ID ?? import.meta.env.VITE_USER_POOL_ID ?? '';
-const CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID ?? import.meta.env.VITE_USER_POOL_CLIENT_ID ?? '';
+export { supabase };
 
-if (!USER_POOL_ID || !CLIENT_ID) {
-  console.warn('⚠️ Cognito not configured. Please set VITE_COGNITO_USER_POOL_ID and VITE_COGNITO_CLIENT_ID in .env.local');
+export async function signIn({ username, password }: { username: string; password: string }) {
+  const { error } = await supabase.auth.signInWithPassword({ email: username, password });
+  if (error) throw new Error(error.message);
 }
 
-Amplify.configure({
-  Auth: {
-    Cognito: {
-      userPoolId: USER_POOL_ID,
-      userPoolClientId: CLIENT_ID,
-      loginWith: {
-        email: true,
-      },
-      signUpVerificationMethod: 'code',
-      userAttributes: {
-        email: {
-          required: true,
-        },
-      },
-      passwordFormat: {
-        minLength: 8,
-        requireLowercase: true,
-        requireUppercase: true,
-        requireNumbers: true,
-      },
-    },
-  },
-});
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw new Error(error.message);
+}
 
-export { signIn, signOut, signUp, confirmSignUp, getCurrentUser };
+export async function signUp({
+  username,
+  password,
+}: {
+  username: string;
+  password: string;
+  options?: { userAttributes?: { email?: string } };
+}) {
+  const { error } = await supabase.auth.signUp({ email: username, password });
+  if (error) throw new Error(error.message);
+}
 
-/** Returns the current user's JWT id-token, or null if not signed in. */
+export async function confirmSignUp(_: { username: string; confirmationCode: string }) {
+  // Supabase handles email confirmation via magic link by default.
+  // If using OTP-style confirmation, handle it via verifyOtp.
+  // For now this is a no-op — the user clicks the link in the confirmation email.
+}
+
+export async function getCurrentUser() {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
+
 export async function getIdToken(): Promise<string | null> {
-  try {
-    const session = await fetchAuthSession();
-    return session.tokens?.idToken?.toString() ?? null;
-  } catch {
-    return null;
-  }
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
 }
 
-/** Builds Authorization headers for API calls. */
 export async function authHeaders(): Promise<Record<string, string>> {
   const token = await getIdToken();
   if (!token) return {};
