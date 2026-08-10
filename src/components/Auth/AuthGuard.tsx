@@ -23,7 +23,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return (
       <>
         <PortfolioPage onLoginClick={() => setModalOpen(true)} />
-        <AuthModal open={modalOpen} onClose={() => setModalOpen(false)} />
+        {modalOpen && <AuthModal onClose={() => setModalOpen(false)} />}
       </>
     );
   }

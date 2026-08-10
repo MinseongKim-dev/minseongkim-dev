@@ -3,27 +3,19 @@ import { LoginForm } from './LoginForm';
 import { SignupForm } from './SignupForm';
 
 interface Props {
-  open: boolean;
   onClose: () => void;
 }
 
-export function AuthModal({ open, onClose }: Props) {
+export function AuthModal({ onClose }: Props) {
   const [showSignup, setShowSignup] = useState(false);
 
   useEffect(() => {
-    if (!open) setShowSignup(false);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
-
-  if (!open) return null;
+  }, [onClose]);
 
   return (
     <div
