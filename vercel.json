@@ -4,7 +4,7 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/((?!portfolio\\.html$).*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ]
