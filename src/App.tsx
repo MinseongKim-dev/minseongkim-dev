@@ -36,7 +36,7 @@ function NodeApp() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Header onMenuClick={() => setMobileMenuOpen(true)} />
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          <div style={{ padding: isMobile ? '12px 14px' : '16px 20px', paddingBottom: isMobile ? 72 : undefined }}>
+          <div style={{ padding: isMobile ? '12px 14px' : '16px 20px', paddingBottom: isMobile ? 72 : undefined, maxWidth: 1080, boxSizing: 'border-box' as const }}>
           <Suspense fallback={null}>
             {view === 'dashboard' && <DashboardView />}
             {view === 'schedule'  && <><SpecialistBanner view="schedule" /><ScheduleView /></>}
