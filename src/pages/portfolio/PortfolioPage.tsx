@@ -39,21 +39,6 @@ export function PortfolioPage({ onLoginClick }: Props) {
   const [typed, setTyped] = useState('');
   const [activeProj, setActiveProj] = useState<Project | null>(null);
 
-  // Let the portfolio page scroll (app's #root has overflow:hidden)
-  useEffect(() => {
-    const root = document.getElementById('root');
-    if (root) {
-      root.style.overflow = 'auto';
-      root.style.height = 'auto';
-    }
-    return () => {
-      if (root) {
-        root.style.overflow = '';
-        root.style.height = '';
-      }
-    };
-  }, []);
-
   // Typing animation
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
