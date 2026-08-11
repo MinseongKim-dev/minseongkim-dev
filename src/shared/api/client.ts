@@ -12,14 +12,13 @@ async function apiRequest<T>(method: string, path: string, body?: unknown, retri
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  // Map legacy /api/{domain} paths to Supabase Edge Function paths
   const fnPath = path.startsWith('/api/')
     ? path.replace('/api/', '/crud/')
     : path.startsWith('/career/')
       ? path.replace('/career/', '/career-coach/')
       : path.startsWith('/ai/')
       ? path.replace('/ai/', '/ai-chat/')
-      : path;
+      : `/crud${path}`;
 
   const res = await fetch(`${FUNCTIONS_URL}${fnPath}`, {
     method,
